@@ -1,4 +1,6 @@
 #!/usr/local/bin/bash
+#
+# $Id$
 
 if [ "$1" = "-p" ]; then
 	Pretty=true
