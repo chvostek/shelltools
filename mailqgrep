@@ -1,0 +1,66 @@
+#!/usr/local/bin/bash
+
+if [ "$1" = "-p" ]; then
+	Pretty=true
+	shift
+elif [ "$MAILQGREP" = "-p" ]; then
+	Pretty=true
+else
+	Pretty=false
+fi
+
+if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
+	lhs="${1%%-*}"
+	rhs="${1##*-}"
+	range="$[ $rhs - $lhs + 1 ]"
+	cmd="zcat"
+	cmd="zgrep -v spamd"
+	for i in `jot $range $lhs` ; do
+		cmd="$cmd /var/log/maillog.$i.gz"
+	done
+	search="$2"
+	shift
+elif echo "$1" | egrep -q '^[0-9]+$'; then
+	if [ ! -f /var/log/maillog.$1.gz ]; then
+		exit 1
+	fi
+	cmd="zcat /var/log/maillog.$1.gz"
+	cmd="zgrep -v spamd /var/log/maillog.$1.gz"
+	search="$2"
+	shift
+else
+	cmd="cat /var/log/maillog"
+	cmd="grep -v spamd /var/log/maillog"
+	search="$1"
+fi
+
+if [ -z "$search" ]; then
+	printf 'NO SEARCH STRING\n'
+	printf "\nUsage: `basename $0` [-p] [daterange] searchstring\n\n"
+	printf "where daterange is blank for the current day, 0 for yesterday,\n"
+	printf "1 for the day before, etc.\n\n"
+	printf "Including the -p option will make output 'pretty'.\n\n"
+	exit 1
+fi
+
+string="`$cmd | egrep \"$search\" | awk '{print $6}' | sort -u | awk '{a = a \"|\" $1} END {print substr(a,2);}'`"
+
+if [ -z "$string" ]; then
+	printf 'NO RECORDS FOUND\n'
+	exit 1
+fi
+
+if $Pretty; then
+	pfilter='s/: (from|to)/\
+	\1/;s/, (msgid|relay|mailer|stat)=/,\
+	\1=/g'
+else
+	pfilter='p'
+fi
+
+printf '\nSEARCH = "%s"' "$search"
+printf '\nSTRING = "%s"\n' "$string"
+printf '\n'
+$cmd | egrep "$string" | sed -E "$pfilter"
+printf '\n'
+
