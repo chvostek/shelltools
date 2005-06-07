@@ -1,6 +1,6 @@
 #!/usr/local/bin/bash
 #
-# $Id$
+# $Id: mailqgrep,v 1.2 2005/04/04 13:03:42 paul Exp paul $
 
 if [ "$1" = "-p" ]; then
 	Pretty=true
@@ -16,7 +16,7 @@ if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
 	rhs="${1##*-}"
 	range="$[ $rhs - $lhs + 1 ]"
 	cmd="zcat"
-	cmd="zgrep -v spamd"
+	cmd="zgrep -hv spamd"
 	for i in `jot $range $lhs` ; do
 		cmd="$cmd /var/log/maillog.$i.gz"
 	done
@@ -63,6 +63,6 @@ fi
 printf '\nSEARCH = "%s"' "$search"
 printf '\nSTRING = "%s"\n' "$string"
 printf '\n'
-$cmd | egrep "$string" | sed -E "$pfilter"
+$cmd | egrep "$string" | uniq | sed -E "$pfilter"
 printf '\n'
 
