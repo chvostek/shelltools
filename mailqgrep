@@ -1,6 +1,6 @@
 #!/usr/local/bin/bash
 #
-# $Id: mailqgrep,v 1.2 2005/04/04 13:03:42 paul Exp paul $
+# $Id: mailqgrep,v 1.3 2005/06/07 14:33:27 paul Exp paul $
 
 if [ "$1" = "-p" ]; then
 	Pretty=true
@@ -15,26 +15,46 @@ if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
 	lhs="${1%%-*}"
 	rhs="${1##*-}"
 	range="$[ $rhs - $lhs + 1 ]"
-	cmd="zcat"
-	cmd="zgrep -hv spamd"
+	if [ -f /var/log/maillog.$1.bz2 ]; then
+		ext=".bz2"
+		cmd="bzgrep"
+	elif [ -f /var/log/maillog.$1.gz ]; then
+		ext=".gz"
+		cmd="zgrep"
+	elif [-f /var/log/maillog.$1 ]; then
+		ext=""
+		cmd="grep"
+	fi
+	cmd="$cmd -hv spamd"
 	for i in `jot $range $lhs` ; do
-		cmd="$cmd /var/log/maillog.$i.gz"
+		cmd="$cmd /var/log/maillog.${i}${ext}"
 	done
 	search="$2"
 	shift
 elif echo "$1" | egrep -q '^[0-9]+$'; then
-	if [ ! -f /var/log/maillog.$1.gz ]; then
+	if [ -f /var/log/maillog.$1.bz2 ]; then
+		ext=".bz2"
+		cmd="bzgrep"
+	elif [ -f /var/log/maillog.$1.gz ]; then
+		ext=".gz"
+		cmd="zgrep"
+	elif [-f /var/log/maillog.$1 ]; then
+		ext=""
+		cmd="grep"
+	else
+		echo "ERROR: no file found" >&2
 		exit 1
 	fi
-	cmd="zcat /var/log/maillog.$1.gz"
-	cmd="zgrep -v spamd /var/log/maillog.$1.gz"
+	cmd="$cmd -v spamd /var/log/maillog.${1}${ext}"
 	search="$2"
 	shift
 else
-	cmd="cat /var/log/maillog"
 	cmd="grep -v spamd /var/log/maillog"
 	search="$1"
 fi
+
+echo "search: $search"
+echo "cmd: $cmd"
 
 if [ -z "$search" ]; then
 	printf 'NO SEARCH STRING\n'
