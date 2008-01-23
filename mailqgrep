@@ -1,6 +1,6 @@
 #!/usr/local/bin/bash
 #
-# $Id: mailqgrep,v 1.4 2005/10/25 11:34:30 paul Exp paul $
+# $Id: mailqgrep,v 1.5 2005/10/25 11:34:51 paul Exp paul $
 
 if [ "$1" = "-p" ]; then
 	Pretty=true
@@ -72,7 +72,7 @@ fi
 if $Pretty; then
 	pfilter='s/: (from|to)/\
 	\1/;s/, (msgid|relay|mailer|stat)=/,\
-	\1=/g'
+	\1=/g;p'
 else
 	pfilter='p'
 fi
@@ -80,6 +80,6 @@ fi
 printf '\nSEARCH = "%s"' "$search"
 printf '\nSTRING = "%s"\n' "$string"
 printf '\n'
-$cmd | egrep "$string" | uniq | sed -E "$pfilter"
+$cmd | egrep "$string" | uniq | sed -nE "$pfilter"
 printf '\n'
 
