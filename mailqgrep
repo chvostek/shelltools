@@ -1,6 +1,6 @@
 #!/usr/local/bin/bash
 #
-# $Id: mailqgrep,v 1.6 2008/01/23 15:50:48 paul Exp $
+# $Id: mailqgrep,v 1.7 2011/02/24 01:54:37 paul Exp paul $
 
 if [ "$1" = "-p" ]; then
 	Pretty=true
@@ -24,6 +24,10 @@ if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
 	elif [ -f /var/log/maillog.$1 ]; then
 		ext=""
 		cmd="grep"
+	else
+		echo "ERROR: no maillog!" >&2
+		ls -l /var/log/maillog.${1}* | sed 's/^/	/' >&2
+		exit 1
 	fi
 	cmd="$cmd -hv spamd"
 	for i in `jot $range $lhs` ; do
@@ -62,6 +66,7 @@ if [ -z "$search" ]; then
 	exit 1
 fi
 
+#echo ">> cmd = $cmd" >&2
 string="`$cmd | egrep \"$search\" | awk '{print $6}' | sort -u | awk '{a = a \"|\" $1} END {print substr(a,2);}'`"
 
 if [ -z "$string" ]; then
