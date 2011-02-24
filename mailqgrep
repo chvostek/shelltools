@@ -1,6 +1,6 @@
 #!/usr/local/bin/bash
 #
-# $Id: mailqgrep,v 1.5 2005/10/25 11:34:51 paul Exp paul $
+# $Id: mailqgrep,v 1.6 2008/01/23 15:50:48 paul Exp $
 
 if [ "$1" = "-p" ]; then
 	Pretty=true
@@ -21,7 +21,7 @@ if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
 	elif [ -f /var/log/maillog.$1.gz ]; then
 		ext=".gz"
 		cmd="zgrep"
-	elif [-f /var/log/maillog.$1 ]; then
+	elif [ -f /var/log/maillog.$1 ]; then
 		ext=""
 		cmd="grep"
 	fi
