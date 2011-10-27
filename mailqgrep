@@ -1,15 +1,52 @@
-#!/usr/local/bin/bash
+#!/usr/bin/env bash
 #
-# $Id: mailqgrep,v 1.7 2011/02/24 01:54:37 paul Exp paul $
+# $Id: mailqgrep,v 1.8 2011/02/16 14:10:28 paul Exp ghoti $
 
-if [ "$1" = "-p" ]; then
+usage() {
+	cat <<EOT
+
+Usage: ${0##*/} [options] [daterange] searchstring
+
+where options are any of:
+	-h	this help
+	-d	include debug output (there isn't much of it)
+	-p	pretty-print (indents et al)
+	-q	quiet (not implemented)
+	-v	verbose (show search string, default if on tty)
+
+and where daterange is blank for the current day, 0 for yesterday,
+1 for the day before, etc.
+
+EOT
+}
+
+# Defaults
+Debug=false
+Pretty=false
+Quiet=false
+Verbose=false
+if [[ "$MAILQGREP" =~ p ]]; then
 	Pretty=true
-	shift
-elif [ "$MAILQGREP" = "-p" ]; then
-	Pretty=true
-else
-	Pretty=false
 fi
+if [[ "$MAILQGREP" =~ q ]]; then
+	Quiet=true
+fi
+if [ -t 0 ] || [[ "$MAILQGREP" =~ v ]]; then
+	Verbose=true
+fi
+
+# Options
+while getopts hpqv opt; do
+  case "$opt" in
+    h)	usage; exit ;;
+    d)	Debug=true ;;
+    p)	Pretty=true ;;
+    q)	Quiet=true; Verbose=false ;;
+    v)	Verbose=true; vflag="-v" ;;
+    *)	usage; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
 
 if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
 	lhs="${1%%-*}"
@@ -59,18 +96,15 @@ fi
 
 if [ -z "$search" ]; then
 	printf 'NO SEARCH STRING\n'
-	printf "\nUsage: `basename $0` [-p] [daterange] searchstring\n\n"
-	printf "where daterange is blank for the current day, 0 for yesterday,\n"
-	printf "1 for the day before, etc.\n\n"
-	printf "Including the -p option will make output 'pretty'.\n\n"
+	usage
 	exit 1
 fi
 
-#echo ">> cmd = $cmd" >&2
+$Debug && echo ">> cmd = $cmd" >&2
 string="`$cmd | egrep \"$search\" | awk '{print $6}' | sort -u | awk '{a = a \"|\" $1} END {print substr(a,2);}'`"
 
 if [ -z "$string" ]; then
-	printf 'NO RECORDS FOUND\n'
+	printf 'NO RECORDS FOUND\n' >&2
 	exit 1
 fi
 
@@ -82,9 +116,9 @@ else
 	pfilter='p'
 fi
 
-printf '\nSEARCH = "%s"' "$search"
-printf '\nSTRING = "%s"\n' "$string"
-printf '\n'
+$Verbose && printf '\nSEARCH = "%s"' "$search"
+$Verbose && printf '\nSTRING = "%s"\n' "$string"
+$Verbose && printf '\n'
 $cmd | egrep "$string" | uniq | sed -nE "$pfilter"
-printf '\n'
+$Verbose && printf '\n'
 
