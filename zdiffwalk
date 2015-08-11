@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
 usage() {
+  echo ""
   echo "Usage: ${0##*/} dataset"
+  echo ""
+  echo "Once running, you can nagivate using:"
+  echo "  j  next pair"
+  echo "  k  previous pair"
+  echo "  l  display a list of snapshots"
+  echo "  q  quit"
+  echo ""
 }
 
 if [ -z "$1" ]; then
