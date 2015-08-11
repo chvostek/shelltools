@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 
+usage() {
+  echo "Usage: ${0##*/} dataset"
+}
+
 if [ -z "$1" ]; then
-  echo "ERROR: no snapshot provided." >&2
+  usage
   exit 1
-elif ! zfs list -Ho name | grep -q "^$1\$"; then
-  echo "ERROR: dataset not found." >&2
+elif ! zfs list -Ho name "$1" >/dev/null; then
   exit 1
-elif ! zfs list -t snapshot -r | grep -q "^$1@"; then
-  echo "ERROR: no snapshots for that dataset." >&2
+elif ! zfs list -t snapshot -rHo name | grep -q "^$1@"; then
+  echo "cannot diff '$1': dataset has no snapshots" >&2
   exit 1
 fi
 
-snaps=($(zfs list -t snapshot -r -Ho name -d 1 "$1"))
+snaps=($(zfs list -t snapshot -rHo name -d 1 "$1"))
 
 if [ ${#snaps[@]} -eq 1 ]; then
   zfs diff "${snaps[0]}"
@@ -24,12 +27,22 @@ lhs=0
 while :; do
   echo ">> ($lhs) zfs diff \"${snaps[$lhs]}\" \"${snaps[$((lhs+1))]}\""
   zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}"
-  read -s -n 1 -p "(j/k/q)? " choice
-  case "$choice" in
-    q) break ;;
-    j) ((lhs++)) ;;
-    k) ((lhs--)) ;;
-  esac
+  choice=""
+  while :; do
+    read -s -n 1 -p "(j/k/l/q)? " choice
+    echo ""
+    case "$choice" in
+      q) break 2 ;;
+      j) ((lhs++)) ;;
+      k) ((lhs--)) ;;
+      l) for ((i=0;i<${#snaps[@]};i++)); do
+           printf "(%d) %s\n" "$i" "${snaps[$i]}"
+         done
+         ;&
+      *) continue ;;
+    esac
+    break
+  done
   case "$lhs" in
     -1) lhs=0 ;;
     ${#snaps[@]}) break ;;
