@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+  echo "ERROR: no snapshot provided." >&2
+  exit 1
+elif ! zfs list -Ho name | grep -q "^$1\$"; then
+  echo "ERROR: dataset not found." >&2
+  exit 1
+elif ! zfs list -t snapshot -r | grep -q "^$1@"; then
+  echo "ERROR: no snapshots for that dataset." >&2
+  exit 1
+fi
+
+snaps=($(zfs list -t snapshot -r -Ho name -d 1 "$1"))
+
+if [ ${#snaps[@]} -eq 1 ]; then
+  zfs diff "${snaps[0]}"
+  exit $?
+fi
+
+echo "Browsing ${#snaps[@]} snapshots..."
+
+lhs=0
+while :; do
+  echo ">> ($lhs) zfs diff \"${snaps[$lhs]}\" \"${snaps[$((lhs+1))]}\""
+  zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}"
+  read -s -n 1 -p "(j/k/q)? " choice
+  case "$choice" in
+    q) break ;;
+    j) ((lhs++)) ;;
+    k) ((lhs--)) ;;
+  esac
+  case "$lhs" in
+    -1) lhs=0 ;;
+    ${#snaps[@]}) break ;;
+  esac
+done
+
