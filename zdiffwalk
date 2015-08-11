@@ -30,6 +30,9 @@ if [ ${#snaps[@]} -eq 1 ]; then
 fi
 
 echo "Browsing ${#snaps[@]} snapshots..."
+for ((i=0;i<${#snaps[@]};i++)); do
+  printf "(%d) %s\n" "$i" "${snaps[$i]}"
+done
 
 lhs=0
 while :; do
