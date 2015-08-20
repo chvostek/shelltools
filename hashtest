@@ -1,0 +1,24 @@
+#!/bin/sh
+
+if ! cd /var/db/freebsd-update; then
+  echo "WHAT?!" >&2
+  exit 1
+fi
+
+# Yes, we're ParsingLs.  Live with it.
+if ! ls | grep -q '.\.gz'; then
+  echo "No files to process." >&2
+  exit 0
+fi
+
+ls | grep '.\.gz' | while read file; do
+
+  if [ ! -f "$file" ]; then
+    echo "That was unexpected.  What is '$file'?" >&2
+    exit 1
+  fi
+
+  [ "$file" != "$(zcat $file | sha256).gz" ] && rm "$file" && echo ">>> $file FAILED (removed)"
+
+done
+
