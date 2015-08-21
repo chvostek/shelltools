@@ -8,6 +8,7 @@ usage() {
   echo "  j  next pair"
   echo "  k  previous pair"
   echo "  l  display a list of snapshots"
+  echo "  g  go to a specific point in the list"
   echo "  q  quit"
   echo ""
 }
