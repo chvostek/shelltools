@@ -48,7 +48,7 @@ while :; do
       j) ((lhs++)) ;;
       k) ((lhs--)) ;;
       g) read -p "Jump to (0-$((${#snaps[@]} - 1))): " go
-         if [ "$go" = 0 ] || [[ "$go" =~ ^[0-9]+$ ]]; then
+         if [[ "$go" =~ ^[0-9]+$ ]] && [ $go -lt ${#snaps[@]} ]; then
            lhs=$go
          fi
          ;;
