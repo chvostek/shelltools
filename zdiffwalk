@@ -40,12 +40,17 @@ while :; do
   zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}"
   choice=""
   while :; do
-    read -s -n 1 -p "(j/k/l/q)? " choice
+    read -s -n 1 -p "(j/k/g/l/q)? " choice
     echo ""
     case "$choice" in
       q) break 2 ;;
       j) ((lhs++)) ;;
       k) ((lhs--)) ;;
+      g) read -p "Jump to (0-$((${#snaps[@]} - 1))): " go
+         if [ "$go" = 0 ] || [[ "$go" =~ ^[0-9]+$ ]]; then
+           lhs=$go
+         fi
+         ;;
       l) for ((i=0;i<${#snaps[@]};i++)); do
            printf "(%d) %s\n" "$i" "${snaps[$i]}"
          done
