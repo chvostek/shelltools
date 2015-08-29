@@ -6,12 +6,12 @@ if ! cd /var/db/freebsd-update; then
 fi
 
 # Yes, we're ParsingLs.  Live with it.
-if ! ls | grep -q '.\.gz'; then
+if ! ls | grep -q '^[0-9a-f]\{64\}\.gz$'; then
   echo "No files to process." >&2
   exit 0
 fi
 
-ls | grep '.\.gz' | while read file; do
+ls | grep '^[0-9a-f]\{64\}\.gz$' | while read file; do
 
   if [ ! -f "$file" ]; then
     echo "That was unexpected.  What is '$file'?" >&2
