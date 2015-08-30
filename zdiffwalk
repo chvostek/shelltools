@@ -2,16 +2,29 @@
 
 usage() {
   echo ""
-  echo "Usage: ${0##*/} dataset"
+  echo "Usage: ${0##*/} [options] dataset"
+  echo ""
+  echo "Options include:"
+  echo "  -t  include timestamp of changed files"
   echo ""
   echo "Once running, you can nagivate using:"
-  echo "  j  next pair"
-  echo "  k  previous pair"
-  echo "  l  display a list of snapshots"
-  echo "  g  go to a specific point in the list"
-  echo "  q  quit"
+  echo "   j  next pair"
+  echo "   k  previous pair"
+  echo "   l  display a list of snapshots"
+  echo "   g  go to a specific point in the list"
+  echo "   q  quit"
   echo ""
 }
+
+showtime=false
+while getopts vt opt; do
+  case "$opt" in
+    v)	Verbose=true; vflag="-v" ;;
+    t)	showtime=true ;;
+    *)	usage; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
 
 if [ -z "$1" ]; then
   usage
@@ -26,7 +39,11 @@ fi
 snaps=($(zfs list -t snapshot -rHo name -d 1 "$1"))
 
 if [ ${#snaps[@]} -eq 1 ]; then
-  zfs diff "${snaps[0]}"
+  if $showtime; then
+    zfs diff -t "${snaps[$lhs]}" | sed 's/^\([0-9]*\).[0-9]*/\1/' | while read d t line; do printf "%s\t%s\t%s\n" "$(date -r $d '+[%Y-%m-%d %T]')" "$t" "$line"; done
+  else
+    zfs diff "${snaps[0]}"
+  fi
   exit $?
 fi
 
@@ -38,7 +55,11 @@ done
 lhs=0
 while :; do
   echo ">> ($lhs) zfs diff \"${snaps[$lhs]}\" \"${snaps[$((lhs+1))]}\""
-  zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}"
+  if $showtime; then
+    zfs diff -t "${snaps[$lhs]}" "${snaps[$((lhs+1))]}" | sed 's/^\([0-9]*\).[0-9]*/\1/' | while read d t line; do printf "%s\t%s\t%s\n" "$(date -r $d '+[%Y-%m-%d %T]')" "$t" "$line"; done
+  else
+    zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}"
+  fi
   choice=""
   while :; do
     read -s -n 1 -p "(j/k/g/l/q)? " choice
