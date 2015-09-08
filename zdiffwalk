@@ -16,16 +16,26 @@ usage() {
   echo ""
 }
 
+# Defaults
+if [ -t 0 ]; then
+  Verbose=true; vflag="-v"
+else
+  Verbose=false; vflag=""
+fi
 showtime=false
-while getopts vt opt; do
+
+# Options
+while getopts vqt opt; do
   case "$opt" in
     v)	Verbose=true; vflag="-v" ;;
+    q)	Verbose=false; vflag="" ;;
     t)	showtime=true ;;
     *)	usage; exit 1 ;;
   esac
 done
 shift $((OPTIND - 1))
 
+# Sanity
 if [ -z "$1" ]; then
   usage
   exit 1
