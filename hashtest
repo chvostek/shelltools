@@ -1,7 +1,10 @@
 #!/bin/sh
 
+euid="$(/usr/bin/id -u)"
+
 if ! cd /var/db/freebsd-update; then
   echo "WHAT?!" >&2
+  [ "$euid" -gt 0 ] && echo "Oh, I'm not root." >&2
   exit 1
 fi
 
@@ -22,7 +25,13 @@ ls -f | grep '^[0-9a-f]\{64\}\.gz$' | while read file; do
     exit 1
   fi
 
-  [ "$file" != "$(zcat $file | sha256).gz" ] && rm "$file" && echo ">>> $file FAILED (removed)"
+  if [ "$file" != "$(zcat $file | sha256).gz" ]; then
+    if [ "$euid" -gt 0 ]; then
+      echo ">>> $FILE FAILED"
+    else
+      rm "$file" && echo ">>> $file FAILED (removed)"
+    fi
+  fi
 
 done
 

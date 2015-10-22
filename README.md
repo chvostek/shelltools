@@ -13,7 +13,9 @@ A mix of things...
       g  go to a specific point in the list
       q  quit
 
-**hashtest** tests the hash values of files downloaded by `freebsd-update`
+**hashtest** tests hash values of files downloaded by `freebsd-update`
+and deletes any files who fail their hash. Obviously, it requires root
+privileges to delete anything. If run as !root, it will show warnings.
 
     Usage: hashtest
 
