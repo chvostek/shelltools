@@ -21,3 +21,15 @@ privileges to delete anything. If run as !root, it will show warnings.
 
     (yes, that's it.)
 
+**voicemailpasswordcheck** does basic sanity checking for Asterisk VM
+password changes. Add or comment rules as you see fit. Pull requests
+are welcome.
+
+To use this, add the following to /etc/asterisk/voicemail.conf:
+
+    [general]
+    externpasscheck=/usr/local/bin/voicemailpasswordcheck
+
+(or add to the section if it already exists.)  Then .. put the file
+where you think it should go. :-)
+
