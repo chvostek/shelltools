@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+#
+# $Id: mailqgrep,v 1.8 2011/02/16 14:10:28 paul Exp ghoti $
+
+usage() {
+	cat <<EOT
+
+Usage: ${0##*/} [options] [daterange] searchstring
+
+where options are any of:
+	-h	this help
+	-d	include debug output (there isn't much of it)
+	-p	pretty-print (indents et al)
+	-q	quiet (not implemented)
+	-v	verbose (show search string, default if on tty)
+
+and where daterange is blank for the current day, 0 for yesterday,
+1 for the day before, etc.
+
+EOT
+}
+
+# Defaults
+Debug=false
+Pretty=false
+Quiet=false
+Verbose=false
+if [[ "$MAILQGREP" =~ p ]]; then
+	Pretty=true
+fi
+if [[ "$MAILQGREP" =~ q ]]; then
+	Quiet=true
+fi
+if [ -t 0 ] || [[ "$MAILQGREP" =~ v ]]; then
+	Verbose=true
+fi
+
+# Options
+while getopts hpqv opt; do
+  case "$opt" in
+    h)	usage; exit ;;
+    d)	Debug=true ;;
+    p)	Pretty=true ;;
+    q)	Quiet=true; Verbose=false ;;
+    v)	Verbose=true; vflag="-v" ;;
+    *)	usage; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
+	lhs="${1%%-*}"
+	rhs="${1##*-}"
+	range="$[ $rhs - $lhs + 1 ]"
+	if [ -f /var/log/maillog.$1.bz2 ]; then
+		ext=".bz2"
+		cmd="bzgrep"
+	elif [ -f /var/log/maillog.$1.gz ]; then
+		ext=".gz"
+		cmd="zgrep"
+	elif [ -f /var/log/maillog.$1 ]; then
+		ext=""
+		cmd="grep"
+	else
+		echo "ERROR: no maillog!" >&2
+		ls -l /var/log/maillog.${1}* | sed 's/^/	/' >&2
+		exit 1
+	fi
+	cmd="$cmd -hv spamd"
+	for i in `jot $range $lhs` ; do
+		cmd="$cmd /var/log/maillog.${i}${ext}"
+	done
+	search="$2"
+	shift
+elif echo "$1" | egrep -q '^[0-9]+$'; then
+	if [ -f /var/log/maillog.$1.bz2 ]; then
+		ext=".bz2"
+		cmd="bzgrep"
+	elif [ -f /var/log/maillog.$1.gz ]; then
+		ext=".gz"
+		cmd="zgrep"
+	elif [-f /var/log/maillog.$1 ]; then
+		ext=""
+		cmd="grep"
+	else
+		echo "ERROR: no file found" >&2
+		exit 1
+	fi
+	cmd="$cmd -v spamd /var/log/maillog.${1}${ext}"
+	search="$2"
+	shift
+else
+	cmd="grep -v spamd /var/log/maillog"
+	search="$1"
+fi
+
+if [ -z "$search" ]; then
+	printf 'NO SEARCH STRING\n'
+	usage
+	exit 1
+fi
+
+$Debug && echo ">> cmd = $cmd" >&2
+string="`$cmd | egrep \"$search\" | awk '{print $6}' | sort -u | awk '{a = a \"|\" $1} END {print substr(a,2);}'`"
+
+if [ -z "$string" ]; then
+	printf 'NO RECORDS FOUND\n' >&2
+	exit 1
+fi
+
+if $Pretty; then
+	pfilter='s/: (from|to)/\
+	\1/;s/, (msgid|relay|mailer|stat)=/,\
+	\1=/g;p'
+else
+	pfilter='p'
+fi
+
+$Verbose && printf '\nSEARCH = "%s"' "$search"
+$Verbose && printf '\nSTRING = "%s"\n' "$string"
+$Verbose && printf '\n'
+$cmd | egrep "$string" | uniq | sed -nE "$pfilter"
+$Verbose && printf '\n'
+
