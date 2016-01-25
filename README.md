@@ -11,6 +11,7 @@ A mix of things...
       k  previous pair
       l  display a list of snapshots
       g  go to a specific point in the list
+      z  zoom
       q  quit
 
 **hashtest** tests hash values of files downloaded by `freebsd-update`
