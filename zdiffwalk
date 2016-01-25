@@ -12,6 +12,7 @@ usage() {
   echo "   k  previous pair"
   echo "   l  display a list of snapshots"
   echo "   g  go to a specific point in the list"
+  echo "   z  zoom"
   echo "   q  quit"
   echo ""
 }
@@ -72,12 +73,15 @@ while :; do
   fi
   choice=""
   while :; do
-    read -s -n 1 -p "(j/k/g/l/q)? " choice
-    echo ""
+    read -s -n 1 -p "(j/k/g/l/z/q)? " choice
+    echo "$choice"
     case "$choice" in
       q) break 2 ;;
       j) ((lhs++)) ;;
       k) ((lhs--)) ;;
+      z)
+         zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}" | nl
+         ;;
       g) read -p "Jump to (0-$((${#snaps[@]} - 1))): " go
          if [[ "$go" =~ ^[0-9]+$ ]] && [ $go -lt ${#snaps[@]} ]; then
            lhs=$go
@@ -87,6 +91,7 @@ while :; do
            printf "(%d) %s\n" "$i" "${snaps[$i]}"
          done
          ;&
+      \?) usage ;;
       *) continue ;;
     esac
     break
