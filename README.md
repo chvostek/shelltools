@@ -34,7 +34,7 @@ To use this, add the following to /etc/asterisk/voicemail.conf:
 (or add to the section if it already exists.)  Then .. put the file
 where you think it should go. :-)
 
-**mailqgrep** helps do searches within Sendmail maillogs.
+**mailqgrep** helps you search through your Sendmail maillogs.
 
 	Usage: mailqgrep [options] [daterange] searchstring
 
