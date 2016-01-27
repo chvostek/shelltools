@@ -46,7 +46,7 @@ while getopts hpqv opt; do
 done
 shift $((OPTIND - 1))
 
-if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
+if egrep -q '^[0-9]-[0-9]+$' <<<"$1"; then
 	lhs="${1%%-*}"
 	rhs="${1##*-}"
 	range="$[ $rhs - $lhs + 1 ]"
@@ -70,7 +70,7 @@ if echo "$1" | egrep -q '^[0-9]-[0-9]+$'; then
 	done
 	search="$2"
 	shift
-elif echo "$1" | egrep -q '^[0-9]+$'; then
+elif egrep -q '^[0-9]+$' <<<"$1"; then
 	if [ -f /var/log/maillog.$1.bz2 ]; then
 		ext=".bz2"
 		cmd="bzgrep"
