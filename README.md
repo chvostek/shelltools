@@ -46,5 +46,5 @@ where you think it should go. :-)
 		-v	verbose (show search string, default if on tty)
 
 	and where daterange is blank for the current day, 0 for yesterday,
-	1 for the day before, etc.
+	1 for the day before, etc. Assuming you're rotating logfiles daily.
 
