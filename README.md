@@ -14,11 +14,11 @@ A mix of things...
       z  zoom
       q  quit
 
-**hashtest** tests hash values of files downloaded by `freebsd-update`
+**cleanupdates** tests hash values of files downloaded by `freebsd-update`
 and deletes any files who fail their hash. Obviously, it requires root
 privileges to delete anything. If run as !root, it will show warnings.
 
-    Usage: hashtest
+    Usage: cleanupdates
 
     (yes, that's it.)
 
