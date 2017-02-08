@@ -34,4 +34,57 @@ function array_contains {
 	return $(( 1 - 0${_arr[$2]} ))
 }
 
+# Avoid external binaries
+# TODO: can we support `-m` option, the multibyte version of `-c`?
+function wc.sh {
+	local opt lwc=""
+	local c=0 w=0 l=0 tc=0 tw=0 tl=0
+	local -a inp=() junk
+	# options: (-[lwc]) (input)
+	while getopts lwc opt; do
+		case "$opt" in
+			l|w|c)	lwc="$lwc$opt" ;;
+			*)	printf 'wc: illegal option -- %s\nusage: wc [-lwc] [file ...]\n' "$opt"; exit 1 ;;
+		esac
+	done
+	lwc=${lwc:-lwc}
+	shift $((OPTIND - 1))
+	if [ $# -eq 0 ]; then
+		files=( "-" )
+	else
+		files=( "$@" )
+	fi
+
+	for file in "${files[@]}"; do
+		l=0; w=0; c=0
+		if [ "$file" = - ]; then
+			file="<(cat)"
+		elif [ ! -f "$file" ]; then
+			printf 'wc: %s: open: No such file or directory\n' "$file"
+			continue
+		fi
+
+		while read -r line; do
+			((l++))
+			junk=( $line ); w+=${#junk[@]}
+			c+=${#line}
+		done < $file
+
+		case "$lwc" in
+			*c*)	printf '%8d' "$c"; tc+=$c ;;
+			*w*)	printf '%8d' "$w"; tw+=$w ;;
+			*l*)	printf '%8d' "$l"; tl+=$l ;;
+		esac
+		printf '%s\n' "$file"
+	done
+
+	if [ "${#files[@]}" -gt 1 ]; then
+		case "$lwc" in
+			*c*)	printf '%8d' "$tc" ;;
+			*w*)	printf '%8d' "$tw" ;;
+			*l*)	printf '%8d' "$tl" ;;
+		esac
+		printf 'total\n'
+	fi
+}
 
