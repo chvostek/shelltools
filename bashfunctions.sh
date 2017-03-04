@@ -34,7 +34,7 @@ function array_contains {
 	return $(( 1 - 0${_arr[$2]} ))
 }
 
-# Avoid external binaries
+# Avoids external binaries
 # TODO: can we support `-m` option, the multibyte version of `-c`?
 function wc.sh {
 	local opt lwc=""
@@ -88,3 +88,30 @@ function wc.sh {
 	fi
 }
 
+function array_quotefix {
+	local inside=false
+	test -n "$1" && local -n arr="${1}"
+	local buf
+	if [[ "${#arr[@]}" -lt 2 ]]; then
+		printf 'usage: array_quotefix arrayname\n\n'
+		printf 'Modifies arrayname, merging fields (with spaces) enclosed in single quotes.\n'
+		printf 'Arrays must obviously have a minimum of two values.\n\n'
+		return 1
+	fi
+	for f in "${!arr[@]}"; do
+		if $inside; then
+			case "${arr[$f]}" in
+			  *"'")
+				arr[$f]="${buf:+$buf }${arr[$f]}"
+				unset buf
+			esac
+		else
+			case "${arr[$f]}" in
+			  "'"*)
+				inside=true
+				buf="${buf:+$buf }${arr[$f]}"
+				unset arr[$f]
+			esac
+		fi
+	done
+}
