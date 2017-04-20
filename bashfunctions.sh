@@ -2,11 +2,13 @@
 urlencode() {
 	local LC_COLLATE=C
 	local length="${#1}"
+	local c=""
+	local i
 	for (( i = 0; i < length; i++ )); do
-		local c="${1:i:1}"
+		c="${1:i:1}"
 		case "$c" in
-			[A-Za-z0-9.~_-]) printf "$c" ;;
-			*) printf '%%%02X' "'$c" ;;
+			[A-Za-z0-9.~_-]) printf '%s' "$c" ;;
+			*) printf '%%%02X' "$c" ;;
 		esac
 	done
 }
