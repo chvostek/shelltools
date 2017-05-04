@@ -31,9 +31,12 @@ _cowfmt() {
 
 #####
 
-if [ "$0" != sh ]; then
-  case "$0" in
-    *cowsay|*cowthink) ${0##*/} "$@" ;;
-  esac
-fi
+case "$0" in
+  sh|dash) : ;;
+  *)
+    case "$0" in
+      *cowsay|*cowthink) ${0##*/} "$@" ;;
+    esac
+    ;;
+esac
 
