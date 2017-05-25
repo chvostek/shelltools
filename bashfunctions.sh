@@ -35,3 +35,19 @@ function array_contains {
 	fi
 }
 
+function array_insert {
+	# options: arrayname index [value]
+	if ! declare -p "$1" 2>/dev/null | grep -q '^declare -a'; then
+		printf '%s: not an array: %s\n' "$0" "$1" >&2
+		return 1
+	fi
+	local -n source="$1"
+	local -a indices=( "${!source[@]}" )
+	for ((i=${#indices[@]}-1; i>=$2; i--)) ; do
+		source[$((i+1))]="${source[$i]}"
+	done
+	if [ -n "$3" ]; then
+		source[$2]="$3"
+	fi
+}
+
