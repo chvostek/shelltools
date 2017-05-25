@@ -13,6 +13,7 @@ usage() {
   echo "   l  display a list of snapshots"
   echo "   g  go to a specific point in the list"
   echo "   z  zoom"
+  echo "   r  refresh snapshot list"
   echo "   q  quit"
   echo ""
 }
@@ -91,6 +92,7 @@ while :; do
            printf "(%d) %s\n" "$i" "${snaps[$i]}"
          done
          ;&
+      r) snaps=($(zfs list -t snapshot -rHo name -d 1 "$1")) ;;
       \?) usage ;;
       *) continue ;;
     esac
