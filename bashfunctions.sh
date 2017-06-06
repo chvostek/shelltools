@@ -51,3 +51,28 @@ function array_insert {
 	fi
 }
 
+function crunch_pwd {
+	local lpwd="$PWD"
+	[[ $PWD = ${HOME}* ]] && lpwd="~${lpwd#$HOME}"
+	while [[ $lpwd =~ (.*)(/[._]?[a-z])[a-z]+(/.*) ]]; do
+		lpwd="${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+	done
+	printf '%s' "$lpwd"
+}
+
+# Add lz4 support to tar in FreeBSD < 11
+function tar {
+	if [[ "$1" == *f ]] && [ -s "$2" -a "$(uname -s)" = FreeBSD -a "$(uname -r)" < 11 ]; then
+		case "$2" in
+			*.lz4)
+				local opt="$1"
+				local what="$2"
+				shift 2
+				lz4cat "$what" | command tar "$opt" - "$@"
+				return $?
+				;;
+		esac
+	fi
+	command tar "$@"
+}
+
