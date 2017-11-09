@@ -1,0 +1,42 @@
+#!/bin/sh
+
+cowsay() {
+  if [ $# = 0 ]; then _cowtext "$(cat -)"; else _cowtext "$*"; fi
+  printf '     | /\n     |/\n'
+  _cowfmt
+}
+
+cowthink() {
+  if [ $# = 0 ]; then _cowtext "$(cat -)"; else _cowtext "$*"; fi
+  printf '     O\n    o\n'
+  _cowfmt
+}
+
+_cowtext() {
+  if [ ${#1} -lt 60 ]; then
+    _width=${#1}
+  else
+    _width=72
+  fi
+  echo "$1" | fmt -w "$_width" | awk -v w=$_width '
+    BEGIN { line=sprintf("  /%0"w"d\\",0); gsub(/0/,"-",line); print line }
+    { printf " | %-"w"s |\n", $0 }
+    END { line=sprintf("  \\%0"w"d/",0); gsub(/0/,"-",line); print line }
+  '
+}
+
+_cowfmt() {
+  printf '(__)\n(oo)\n \\/-------\\\n  ||     | \\\n  /\\----/\\  *\n  ~~    ~~\n' | sed 's/^/   /'
+}
+
+#####
+
+case "$0" in
+  sh|dash) : ;;
+  *)
+    case "$0" in
+      *cowsay|*cowthink) ${0##*/} "$@" ;;
+    esac
+    ;;
+esac
+
