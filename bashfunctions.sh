@@ -112,6 +112,7 @@ function wc.sh {
 		esac
 		printf 'total\n'
 	fi
+}
 
 # Add lz4 support to tar in FreeBSD < 11
 function tar {
@@ -145,6 +146,7 @@ function array_quotefix {
 			  *"'")
 				arr[$f]="${buf:+$buf }${arr[$f]}"
 				unset buf
+				;;
 			esac
 		else
 			case "${arr[$f]}" in
@@ -152,6 +154,7 @@ function array_quotefix {
 				inside=true
 				buf="${buf:+$buf }${arr[$f]}"
 				unset arr[$f]
+				;;
 			esac
 		fi
 	done
