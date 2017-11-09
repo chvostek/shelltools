@@ -70,7 +70,9 @@ function wc.sh {
 	while getopts lwc opt; do
 		case "$opt" in
 			l|w|c)	lwc="$lwc$opt" ;;
-			*)	printf 'wc: illegal option -- %s\nusage: wc [-lwc] [file ...]\n' "$opt"; exit 1 ;;
+			*)	printf 'wc: illegal option -- %s\nusage: wc [-lwc] [file ...]\n' "$opt"
+				return 1
+				;;
 		esac
 	done
 	lwc=${lwc:-lwc}
