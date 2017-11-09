@@ -115,7 +115,7 @@ function wc.sh {
 
 # Add lz4 support to tar in FreeBSD < 11
 function tar {
-	if [[ "$1" == *f ]] && [ -s "$2" -a "$(uname -s)" = FreeBSD -a "$(uname -r)" < 11 ]; then
+	if [[ "$1" == *f ]] && [ -s "$2" -a "$(uname -s)" = FreeBSD -a "$(uname -r | cut -d. -f1)" -lt 11 ]; then
 		case "$2" in
 			*.lz4)
 				local opt="$1"
