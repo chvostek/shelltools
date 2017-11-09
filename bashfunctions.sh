@@ -63,20 +63,37 @@ function crunch_pwd {
 # Avoid external binaries
 # TODO: can we support `-m` option, the multibyte version of `-c`?
 function wc.sh {
-	local opt lwc=""
+	local opt="" lwc=""
 	local c=0 w=0 l=0 tc=0 tw=0 tl=0
 	local -a inp=() junk
 	# options: (-[lwc]) (input)
+echo "MARK0"
 	while getopts lwc opt; do
+echo "MARK1"
+echo "opt=$opt"
 		case "$opt" in
-			l|w|c)	lwc="$lwc$opt" ;;
+			#l|w|c)	lwc="$lwc$opt" ;;
+			l)	lwc="$lwc$opt" ;;
+			w)	lwc="$lwc$opt" ;;
+			c)	lwc="$lwc$opt" ;;
 			*)	printf 'wc: illegal option -- %s\nusage: wc [-lwc] [file ...]\n' "$opt"
 				return 1
 				;;
 		esac
 	done
-	lwc=${lwc:-lwc}
-	shift $((OPTIND - 1))
+echo "1 lwc=$lwc"
+	lwc="${lwc:-lwc}"
+echo "2 lwc=$lwc"
+#printf 'OPTIND = %s\n' "$OPTIND"
+#printf '\t= %s\n' "$@"
+#printf '\t0 = %s\n' "$0"
+#printf '\t1 = %s\n' "$1"
+#printf '\t2 = %s\n' "$2"
+	if [ -n "$lwc" ]; then
+		shift $((OPTIND - 1))
+	fi
+#printf '\t0 = %s\n' "$0"
+#printf '\t1 = %s\n' "$1"
 	if [ $# -eq 0 ]; then
 		files=( "-" )
 	else
@@ -87,30 +104,35 @@ function wc.sh {
 		l=0; w=0; c=0
 		if [ "$file" = - ]; then
 			file="<(cat)"
+			file="/dev/stdin"
 		elif [ ! -f "$file" ]; then
 			printf 'wc: %s: open: No such file or directory\n' "$file"
 			continue
 		fi
 
+echo "file=$file"
 		while read -r line; do
-			((l++))
-			junk=( $line ); w+=${#junk[@]}
-			c+=${#line}
+			(( l++ ))
+			junk=( $line ); (( w+=${#junk[@]} ))
+			(( c+=${#line} ))
 		done < $file
 
 		case "$lwc" in
-			*c*)	printf '%8d' "$c"; tc+=$c ;;
-			*w*)	printf '%8d' "$w"; tw+=$w ;;
-			*l*)	printf '%8d' "$l"; tl+=$l ;;
+			#*l*)	printf '%8d' "$((10#$l))"; ((tl+=l)) ;;
+			#*w*)	printf '%8d' "$((10#$w))"; ((tw+=w)) ;;
+			#*c*)	printf '%8d' "$((10#$c))"; ((tc+=c)) ;;
+			*l*)	printf '%s\t' "$((10#$l))"; ((tl+=l)) ;;
+			*w*)	printf '%s\t' "$((10#$w))"; ((tw+=w)) ;;
+			*c*)	printf '%s\t' "$((10#$c))"; ((tc+=c)) ;;
 		esac
 		printf '%s\n' "$file"
 	done
 
 	if [ "${#files[@]}" -gt 1 ]; then
 		case "$lwc" in
-			*c*)	printf '%8d' "$tc" ;;
-			*w*)	printf '%8d' "$tw" ;;
-			*l*)	printf '%8d' "$tl" ;;
+			*l*)	printf '%8d' "$((10#$tl))" ;;
+			*w*)	printf '%8d' "$((10#$tw))" ;;
+			*c*)	printf '%8d' "$((10#$tc))" ;;
 		esac
 		printf 'total\n'
 	fi
