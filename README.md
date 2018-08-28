@@ -2,7 +2,7 @@
 
 A mix of things...
 
-**zdiffwalk** walks through snapshots, showing you `zdiff` output.
+**zdiffwalk** walks through snapshots, showing you `zfs diff` output.
 
     Usage: zdiffwalk dataset
 
