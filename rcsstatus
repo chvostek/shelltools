@@ -1,0 +1,54 @@
+#!/bin/sh
+
+workingfile() {
+	rlog "$1" | awk -F': ' '/^Working file:/{print $2}'
+}
+
+is_locked() {
+	rlog "$1" | awk '/^locks:/{getline; if (/^access list:/) exit 1; else; exit 0}'
+}
+
+is_modified() {
+	rcsdiff "$1" >/dev/null 2>/dev/null
+}
+
+locks() {
+	rlog "$1" | awk -F': ' '
+	/^locks:/ { n=1; next }
+	n==0 { next }
+	/^access list:/ { exit }
+	{ $1=$1; locks=locks " " $1 }
+	END {
+		gsub(/[[:space:]]+/," ",locks)
+		sub(/^ +/,"",locks); sub(/ +$/,"",locks)
+		print locks
+	}'
+}
+
+rcsstatus() {
+	local locked='🔒'
+	local unlocked='🔓'
+	local r f
+	[ -d "$1" ] && cd "$1"
+	for r in *,v RCS/*,v; do
+		[ -e "$r" ] || continue
+		f="$(workingfile "$r")"
+		[ -e "$f" ] || continue
+		[ -s "$f" ] || continue
+		if is_locked "$f"; then
+			if is_modified "$f"; then
+				stat="M"
+			else
+				stat="$locked"
+			fi
+			locks="$(locks "$f")"
+			printf '%-4s  %s (%s) %s\n' "$stat" "$f" "$locks" "$(rcsdiff "$f" 2>/dev/null | awk '/^</{n++} /^>/{m++} END{printf "<%d, >%d",n,m}')"
+		fi
+	done
+}
+
+case $- in
+  *i*) : ;;
+  *) rcsstatus "$@" ;;
+esac
+
