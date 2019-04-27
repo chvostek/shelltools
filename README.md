@@ -48,3 +48,12 @@ where you think it should go. :-)
 	and where daterange is blank for the current day, 0 for yesterday,
 	1 for the day before, etc. Assuming you're rotating logfiles daily.
 
+**grab** fetches files from a remote server, perhaps safely.
+
+	grab -h
+	grab [-div] [user@]host:file ...
+
+	For each file that grab copies, the target location is tested
+	for permission and available space. If tests for any files fail,
+	then no files are copied and temporary files are removed.
+

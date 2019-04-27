@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+
+grab_usage() {
+	cat <<EOusage | mdformat
+
+**NAME**
+	${0##*/} - copy files from a remote host
+
+**SYNOPSIS**
+	${0##*/} -h
+	${0##*/} [**-div**] [_user_@]_host_:_file_ ...
+
+**DESCRIPTION**
+	For each file that ${0##*/} copies, the target location is tested
+	for permission and available space. If tests for any files fail,
+	then no files are copied and temporary files are removed.
+
+EOusage
+}
+
+mdformat() {
+	local md=$(tput md)	# bold
+	local so=$(tput so)	# standout (inverse?)
+	local us=$(tput us)	# underline
+	local mr=$(tput mr)	# reverse
+	local me=$(tput me)	# exit attributes
+	sed -E \
+		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
+		-e "s/\*([^*]+)\*/$us\1$me/g" \
+		-e "s/_([^_]+)_/$us\1$me/g" \
+		-e "s/^#+ *(.+)/$so\1$me/g" \
+		-e "s/#([^#]+)#/$mr\1$me/g"
+}
+
+grab_vars() {
+
+	declare -g -a grab_ssh_args=(
+		-o ControlMaster=auto
+		-o ControlPath="/tmp/$$-%r@%h:%p"
+		-o ControlPersist=1h
+	)
+	declare -g -A grab_hosts=()
+	declare -g -A grab_sources=()
+	declare -g -A grab_tmpfiles=()
+
+	local item
+	for item in "$@"; do
+		if [[ "$item" =~ ^(([a-z0-9]+@)?[a-z0-9][a-z0-9-]*):(.*) ]]; then
+			grab_hosts[${BASH_REMATCH[1]}]=1
+			grab_sources["$item"]=1
+		fi
+	done
+
+}
+
+grab_sanitycheck() {
+	local item err=""
+	for item in "$@"; do
+		if [[ ! "$item" =~ ^(([a-z0-9]+@)?[a-z0-9][a-z0-9-]*):(.+) ]]; then
+			printf -v err '%sFormat error on: %s\n' "$err" "$item"
+		fi
+	done
+	if [ -n "$err" ]; then
+		echo "$err" >&2
+		return 1
+	fi
+}
+
+grab_setup_tunnels() {
+	local item
+	local err=""
+	for item in "${!grab_hosts[@]}"; do
+		if ! ssh -fNT "${grab_ssh_args[@]}" "$item"; then
+			printf -v err '%sTunnel failure on: %s\n' "$err" "$host"
+		fi
+	done
+	if [ -n "$err" ]; then
+		echo "$err" >&2
+		return 1
+	fi
+}
+
+grab_teardown_tunnels() {
+	local item
+	for item in "${!grab_hosts[@]}"; do
+		ssh "${grab_ssh_args[@]}" -qOexit "$item"
+	done
+	return 0
+}
+
+grab_rm_tmpfiles() {
+	local tmpfile
+	for tmpfile in "${grab_tmpfiles[@]}"; do
+		rm -f "$tmpfile"
+	done
+}
+
+grab_verify_sources() {
+	local item err=""
+	local host file
+	for item in "${!grab_sources[@]}"; do
+		host="${item%%:*}"; file="${item#*:}"
+		if ssh "${grab_ssh_args[@]}" "$host" test -s "$file" -a -r "$file"; then
+			grab_sources[$item]=$(ssh "${grab_ssh_args[@]}" "$host" sha256 -q "$file")
+		else
+			printf -v err '%sSource missing: %s\n' "$err" "$item"
+		fi
+	done
+	if [ -n "$err" ]; then
+		echo "$err" >&2
+		return 1
+	fi
+}
+
+grab_verify_targets() {
+	local item err=""
+	local host file
+	local tag; printf -v tag '%s-%(%Y%m%d)T' "${HOST%%.*}" -1
+	for item in "${!grab_sources[@]}"; do
+		host="${item%%:*}"; file="${item#*:}"
+		if [ ! -f "$file" ]; then
+			if [ ! -w "${file%/*}" ]; then
+				printf -v err '%sNo write permissions on directory: %s\n' "$err" "${file%/*}"
+			fi
+		elif [ ! -w "$file" ]; then
+			printf -v err '%sNo write permissions on file: %s\n' "$err" "$file"
+		elif [ -f "${file}-$tag" ]; then
+			printf -v err '%sTagged backup already exists: %s\n' "$err" "${file}-$tag"
+		elif [[ $(sha256 -q "$file") = "${grab_sources[$item]}" ]]; then
+			printf -v err '%sFile already matches: %s\n' "$err" "${file}"
+		fi
+		if [ -z "$err" ]; then
+			# set a temp file
+			tmpfile=$(mktemp "$file".XXXXXX) ||
+			tmpfile=$(mktemp "/tmp/${file//\//_}".XXXXXX) ||
+			tmpfile=""
+			if [ -n "$tmpfile" -a -w "$tmpfile" ]; then
+				grab_tmpfiles["$item"]="$tmpfile"
+			else
+				printf -v err '%sCannot write tmpfile: %s\n' "$err" "${file}"
+				unset grab_sources["$item"]
+			fi
+		fi
+	done
+	if [ -n "$err" ]; then
+		echo "$err" >&2
+		#return 1
+	fi
+}
+
+grab_set_tmp() {
+	local item
+	local host file
+	for item in "${!grab_sources[@]}"; do
+		host="${item%%:*}"; file="${item#*:}"
+		:
+	done
+}
+
+grab_fetch_sources() {
+	local item
+	local host file
+	for item in "${!grab_sources[@]}"; do
+		host="${item%%:*}"; file="${item#*:}"
+		if ! scp $qopt "$item" "${grab_tmpfiles[$item]}"; then
+			return 1
+		fi
+	done
+}
+
+grab_backup_targets() {
+	local item
+	local host file
+	for item in "${!grab_sources[@]}"; do
+		host="${item%%:*}"; file="${item#*:}"
+		test -f "$file" && cp $vopt -p "$file" "$file"."${grab_backupextn:-bak}"
+	done
+}
+
+grab_finalize() {
+	local item
+	local host file
+	local choice
+	for item in "${!grab_sources[@]}"; do
+		host="${item%%:*}"; file="${item#*:}"
+		$grab_show_diff && diff -uN "$file" "${grab_tmpfiles[$item]}"
+		$grab_interactive && {
+			read -p $'Proceed with $file (Yes/Skip/Abort)? Y\b' choice
+			case "$choice" in
+				A*|a*) echo "Aborting." >&2; break ;;
+				S*|s*) echo "Skipping." >&2; continue ;;
+				*)
+			esac
+		}
+		mv $vopt "${grab_tmpfiles[$item]}" "$file"
+	done
+}
+
+grab() {
+	if [ $# -eq 0 ]; then
+		grab_usage
+		exit 64
+	fi
+
+	# default verbose if we're on a terminal
+	declare -g vopt="" qopt="" Verbose
+	if [ -t 0 ]; then
+		Verbose=true
+		vopt="-v"; qopt=""
+	else
+		Verbose=false
+		vopt=""; qopt="-q"
+	fi
+
+	# can be overridden
+	declare -g grab_backupextn="${grab_backupextn:-bak}"
+	declare -g grab_show_diff=false
+	declare -g grab_interactive=false
+
+	while getopts hdivb:q opt; do
+		case "$opt" in
+			h)  grab_usage; exit 0 ;;
+			d)  grab_show_diff=true ;;
+			i)  grab_interactive=true ;;
+			v)  Verbose=true; vopt="-v"; qopt="" ;;
+			b)  grab_backupextn="$OPTARG" ;;
+			q)  Verbose=false; vopt=""; qopt="-q" ;;
+			*)  usage; exit 64 ;;
+		esac
+	done
+	shift $((OPTIND - 1))
+
+	#$Verbose && echo "Verbose=on" >&2
+	grab_vars "$@"
+	grab_sanitycheck "$@" || { echo "Aborting." >&2; exit 65; }
+
+	trap "grab_rm_tmpfiles; grab_teardown_tunnels" 0
+
+	grab_verify_targets && grab_setup_tunnels && grab_verify_sources || {
+		echo "Aborting." >&2
+		grab_teardown_tunnels
+		exit 66
+	}
+
+	grab_set_tmp
+
+	if ! grab_fetch_sources; then
+		echo "Aborting." >&2
+		grab_rm_tmpfiles
+		grab_teardown_tunnels
+		exit 66
+	fi
+
+	grab_backup_targets
+
+	grab_finalize
+
+}
+
+# only execute if we're called directly
+case "$-" in
+	*i*) : ;;
+	*) grab "$@" ;;
+esac
+
