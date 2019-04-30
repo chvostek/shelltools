@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+dedup_usage() {
+	cat <<EOusage | mdformat
+
+**NAME**
+	${0##*/} - deduplicate files with hard links
+
+**SYNOPSIS**
+	${0##*/} -h
+	${0##*/} [**-nv**] [dir/ ...]
+
+**DESCRIPTION**
+	Deduplicates all files in given directories using hard links.
+	File similarity is based on a hash, calculated with "$dedup_hash".
+	Older files are hardlinked to newer files.
+
+EOusage
+}
+
+mdformat() {
+	local md=$(tput md)	# bold
+	local so=$(tput so)	# standout (inverse?)
+	local us=$(tput us)	# underline
+	local mr=$(tput mr)	# reverse
+	local me=$(tput me)	# exit attributes
+	sed -E \
+		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
+		-e "s/\*([^*]+)\*/$us\1$me/g" \
+		-e "s/_([^_]+)_/$us\1$me/g" \
+		-e "s/^#+ *(.+)/$so\1$me/g" \
+		-e "s/#([^#]+)#/$mr\1$me/g"
+}
+
+warn() {
+	printf '\r%s\n' "$*"
+}
+
+info() {
+	printf '\r%s\e[K\r' "$*"
+}
+
+dedup_vars() {
+	declare -g Verbose=false vopt="" noop=""
+	declare -g -A dedup_list=()
+	declare -g dedup_hash=""
+	local hash_options=(
+		"b2sum"
+		"md5 -r"
+		"md5sum"
+	)
+	for dedup_hash in "${hash_options[@]}"; do
+		( $dedup_hash /dev/null >/dev/null 2>/dev/null ) && return
+	done
+	echo "ERROR: no hash calculator." >&2
+	exit 70
+}
+
+dedup() {
+	dedup_vars
+	local opt source hash file
+	while getopts hvn opt; do
+		case "$opt" in
+			h) dedup_usage; exit 0 ;;
+			v) Verbose=true; vopt="-v" ;;
+			n) noop=echo ; nopt="-n" ;;
+			*) dedup_usage; exit 64 ;;
+		esac
+	done
+	shift $((OPTIND - 1))
+
+	[[ $# -eq 0 ]] && { dedup_usage; exit 65; }
+
+	for source in "$@"; do
+	  if [[ ! -d "$source" ]] || [[ ! -w "$source" ]]; then
+	    echo "ERROR: $source is not a readable directory." >&2
+	    exit 65
+	  fi
+	done
+
+	find "$@" -type f -name '[A-za-z0-9]*' -exec $dedup_hash {} \+ |
+	while read -r hash file; do
+		[[ ! -f "$file" ]] && { warn "skipped: $file"; continue; }
+		[[ -z "${dedup_list[h$hash]}" ]] && { info "found: $file"; dedup_list[h"$hash"]="$file"; continue; }
+		#$Verbose && printf '> %s %s\n' "$hash" "$file"
+		if [[ "$file" -ot "${dedup_list[h$hash]}" ]]; then
+			#printf '> %s < %s\n' "$(ls -lT "$file")" "$(ls -lT "${dedup_list[h$hash]}")"
+			$noop ln $vopt -f "$file" "${dedup_list[h$hash]}"
+		else
+			#printf '> %s > %s\n' "$(ls -lT "${dedup_list[h$hash]}")" "$(ls -lT "$file")"
+			$noop ln $vopt -f "${dedup_list[h$hash]}" "$file" 
+		fi
+	done
+	printf '\r\e[K\n'
+}
+
+# only execute if we're called directly
+case "$-" in
+	*i*) : ;;
+	*) dedup "$@" ;;
+esac
+

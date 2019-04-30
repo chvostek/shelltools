@@ -57,3 +57,12 @@ where you think it should go. :-)
 	for permission and available space. If tests for any files fail,
 	then no files are copied and temporary files are removed.
 
+**dedup** deduplicates files with hard links
+
+	dedup -h
+	dedup [-nv] [dir/ ...]
+
+	Deduplicates all files in given directories using hard links.
+	File similarity is based on a hash calculated with b2sum or md5.
+	Older files are hardlinked to newer files.
+
