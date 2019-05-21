@@ -66,3 +66,12 @@ where you think it should go. :-)
 	File similarity is based on a hash calculated with b2sum or md5.
 	Older files are hardlinked to newer files.
 
+**narp** named arp
+
+	narp
+	narp -g
+
+	Provides modified `arp -an` output, with names from /etc/ethers.
+	When run interactively or with `-g`, uses vt100/xterm/ansi codes
+	for boldface.
+

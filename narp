@@ -1,0 +1,47 @@
+#!/bin/sh
+
+if [ -t 1 ] || [ "$1" = "-g" ]; then
+ i=1
+else
+ i=0
+fi
+
+arp -an | awk -v i=$i '
+
+  function fix(addr,     a, o, fs, i) {
+    split(tolower(addr), a, ":")
+    o=""; fs=""
+    for (i=1; i<=6; i++) {
+      o=sprintf("%s%s%02s", o, fs, a[i])
+      fs=":"
+    }
+    gsub(/ /,"0",o)	# because "%02s" does not work in gawk/mawk
+    return o
+  }
+
+  BEGIN {
+    FS="[[:space:]]+"
+    if (i) {
+      bold="[1m";
+      norm="[0m";
+    }
+  }
+
+  /incomplete/ { next }
+
+  NR==FNR && /^[0-9a-f][0-9a-f]?:/ {
+    e[fix($1)]=$2
+    #print "> " fix($1)
+  }
+  NR==FNR { next }
+
+  { $4 = fix($4) }
+
+  $4 in e {
+    #$4=bold e[$4] norm "(" $4 ")"
+    $4=$4 "(" bold e[$4] norm ")"
+  }
+
+  1' /etc/ethers - 
+#| column -t | sed -nE -e '/([^[:space:]]+[^[:space:]]+)/{;s//\1      /;p;d;}' -e '/([^[:space:]]+)/{;s//\1   /;p;d;}' -e p
+
