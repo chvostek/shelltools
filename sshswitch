@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Populate ARP cache
+ping -t 1 -c 1 "$1" >/dev/null 2>/dev/null &
+sleep 0.25 2>/dev/null || sleep 1
+
+if arp -an | fgrep -q "$1"; then
+	# If the IP in $1 is local, connect directly
+	case "$1" in
+		*:*)	nc "${1%:*}" "${1#*}" ;;
+		*)	nc "$1" 22 ;;
+	esac
+else
+	# If the IP is not local, run a command.
+	shift
+	$*
+fi
+

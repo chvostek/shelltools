@@ -75,3 +75,11 @@ where you think it should go. :-)
 	When run interactively or with `-g`, uses vt100/xterm/ansi codes
 	for boldface.
 
+**sshswitch** ssh connections via the best means possible
+
+	sshswitch [ip address] [command line]
+
+	Gets used by openssh ProxyCommand to connect directly to an IP
+	if that IP is on the local network (i.e. is in the ARP table),
+	or run a command to connect to it otherwise.
+
