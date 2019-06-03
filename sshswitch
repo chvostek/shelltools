@@ -1,10 +1,56 @@
 #!/usr/bin/env bash
 
+sshswitch_usage() {
+	cat <<EOusage | mdformat
+
+**NAME**
+	${0##*/} - select ssh connection method based on availability
+
+**SYNOPSIS**
+	${0##*/} _hostip_ "_command line_"
+
+**DESCRIPTION**
+	This is a ProxyCommand helper. The first option (**\$1**) is the
+	IP address you're trying to reach. If the IP is local (i.e. in
+	the ARP cache), we connect to it directly. Otherwise, we execute
+	the remaining options to establish the connection.
+
+**EXAMPLES**
+	The following might be used if you sometimes connect to the
+	192.168.2.0/24 network, which has a gateway on its .1 IP, and
+	that gateway is perhaps accessible from some other host via an
+	SSH tunnel or VPN.
+
+	host gw 192.168.2.1
+	    ProxyCommand ~/bin/sshswitch 192.168.2.1 ssh -xaqW10.0.0.2:22 foo
+
+	host bar 192.168.2.*
+	    ProxyCommand ~/bin/sshswitch %h "ssh -xaqW%h:22 gw"
+
+EOusage
+}
+
+mdformat() {
+	local md=$(tput md)	# bold
+	local so=$(tput so)	# standout (inverse?)
+	local us=$(tput us)	# underline
+	local mr=$(tput mr)	# reverse
+	local me=$(tput me)	# exit attributes
+	sed -E \
+		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
+		-e "s/\*([^*]+)\*/$us\1$me/g" \
+		-e "s/_([^_]+)_/$us\1$me/g" \
+		-e "s/^#+ *(.+)/$so\1$me/g" \
+		-e "s/#([^#]+)#/$mr\1$me/g"
+}
+
 # Populate ARP cache
 ping -t 1 -c 1 "$1" >/dev/null 2>/dev/null &
 sleep 0.25 2>/dev/null || sleep 1
 
-if arp -an | fgrep -q "$1"; then
+if [ $# -eq 0 ]; then
+	sshswitch_usage
+elif arp -an | fgrep -q "$1"; then
 	# If the IP in $1 is local, connect directly
 	case "$1" in
 		*:*)	nc "${1%:*}" "${1#*}" ;;
