@@ -8,12 +8,20 @@ sshswitch_usage() {
 
 **SYNOPSIS**
 	${0##*/} _hostip_ "_command line_"
+	${0##*/} _hostname_
 
 **DESCRIPTION**
-	This is a ProxyCommand helper. The first option (**\$1**) is the
-	IP address you're trying to reach. If the IP is local (i.e. in
-	the ARP cache), we connect to it directly. Otherwise, we execute
-	the remaining options to establish the connection.
+	This is a ProxyCommand helper.
+
+	In the first usage, the first option (**\$1**) is the IP address
+	you're trying to reach. If the IP is local (i.e. in the ARP
+	cache), we connect to it directly. Otherwise, we execute the
+	remaining options as a command line to establish the connection.
+
+	In the second usage, _hostname_ is a name found in /etc/ethers,
+	whose MAC address will be looked up in the local ARP table. This
+	allows you to ssh to hosts whose IP addresses change, but whose
+	(static) ethernet address is recorded.
 
 **EXAMPLES**
 	The following might be used if you sometimes connect to the
@@ -26,6 +34,22 @@ sshswitch_usage() {
 
 	host bar 192.168.2.*
 	    ProxyCommand ~/bin/sshswitch %h "ssh -xaqW%h:22 gw"
+
+	The following might be used to connect to hosts with dynamic
+	(DHCP-assigned) IP addresses on the local network, where the
+	only thing static is the MAC address.
+
+	~/.ssh/config:
+
+	    host flarn spoo
+	        ProxyCommand ~/bin/sshswitch %h
+
+	/etc/ethers:
+
+	    dc:a9:04:03:02:01       flarn
+
+	$ arp -an
+	? (192.168.1.2) at dc:a9:04:03:02:01 on em0 ifscope [ethernet]
 
 EOusage
 }
@@ -50,6 +74,11 @@ sleep 0.25 2>/dev/null || sleep 1
 
 if [ $# -eq 0 ]; then
 	sshswitch_usage
+elif [ $# -eq 1 ] && grep -qw "$1" /etc/ethers; then
+	nc "$(arp -an | awk -v h="$1" 'NR==FNR{a[$1]=$2;next} a[$4]==h{gsub(/[()]/,"",$2);print $2;exit}' /etc/ethers -)" 22
+elif [ $# -eq 1 ]; then
+	printf 'ERROR: host not found\n' >&2
+	exit 68
 elif arp -an | fgrep -q "$1"; then
 	# If the IP in $1 is local, connect directly
 	case "$1" in
