@@ -1,12 +1,14 @@
 #!/bin/sh
 
 if [ -t 1 ] || [ "$1" = "-g" ]; then
- g=1
+ md=$(tput md)	# bold
+ me=$(tput me)	# exit attributes
 else
- g=0
+ md=""
+ me=""
 fi
 
-arp -an | awk -v g=$g '
+arp -an | awk -v bold="$md" -v norm="$me" '
 
   function fix(addr,     a, o, fs, i) {
     split(tolower(addr), a, ":")
@@ -21,10 +23,6 @@ arp -an | awk -v g=$g '
 
   BEGIN {
     FS="[[:space:]]+"
-    if (g) {
-      bold="[1m";
-      norm="[0m";
-    }
   }
 
   /incomplete/ { next }
