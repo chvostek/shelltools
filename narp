@@ -1,12 +1,12 @@
 #!/bin/sh
 
 if [ -t 1 ] || [ "$1" = "-g" ]; then
- i=1
+ g=1
 else
- i=0
+ g=0
 fi
 
-arp -an | awk -v i=$i '
+arp -an | awk -v g=$g '
 
   function fix(addr,     a, o, fs, i) {
     split(tolower(addr), a, ":")
@@ -21,7 +21,7 @@ arp -an | awk -v i=$i '
 
   BEGIN {
     FS="[[:space:]]+"
-    if (i) {
+    if (g) {
       bold="[1m";
       norm="[0m";
     }
