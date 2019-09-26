@@ -18,7 +18,7 @@ urldecode() {
 }
 
 
-function array_contains {
+array_contains() {
 	# options: arrayname value
 	if [[ ${BASH_VERSION%%.*} -ge 4 ]]; then
 		# Avoid the loop
@@ -35,7 +35,7 @@ function array_contains {
 	fi
 }
 
-function array_insert {
+array_insert() {
 	# options: arrayname index [value]
 	if ! declare -p "$1" 2>/dev/null | grep -q '^declare -a'; then
 		printf '%s: not an array: %s\n' "$0" "$1" >&2
@@ -51,7 +51,7 @@ function array_insert {
 	fi
 }
 
-function crunch_pwd {
+crunch_pwd() {
 	local lpwd="$PWD"
 	[[ $PWD = ${HOME}* ]] && lpwd="~${lpwd#$HOME}"
 	while [[ $lpwd =~ (.*)(/[._]?[a-z])[a-z]+(/.*) ]]; do
@@ -62,7 +62,7 @@ function crunch_pwd {
 
 # Avoid external binaries
 # TODO: can we support `-m` option, the multibyte version of `-c`?
-function wc.sh {
+wc.sh() {
 	local opt="" lwc=""
 	local c=0 w=0 l=0 tc=0 tw=0 tl=0
 	local -a inp=() junk
@@ -139,7 +139,7 @@ echo "file=$file"
 }
 
 # Add lz4 support to tar in FreeBSD < 11
-function tar {
+tar() {
 	if [[ "$1" == *f ]] && [ -s "$2" -a "$(uname -s)" = FreeBSD -a "$(uname -r | cut -d. -f1)" -lt 11 ]; then
 		case "$2" in
 			*.lz4)
@@ -154,7 +154,7 @@ function tar {
 	command tar "$@"
 }
 
-function array_quotefix {
+array_quotefix() {
 	local inside=false
 	test -n "$1" && local -n arr="${1}"
 	local buf
