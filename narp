@@ -1,45 +1,43 @@
-#!/bin/sh
+#!/usr/bin/awk -f
 
-if [ -t 1 ] || [ "$1" = "-g" ]; then
- md=$(tput md)	# bold
- me=$(tput me)	# exit attributes
-else
- md=""
- me=""
-fi
+function nrmlz(mac,     i,a,o) {
+	if (tolower(mac) !~ /^[0-9a-f]{1,2}(:[0-9a-f]{1,2}){5}$/) return "<" mac ">"
+	split(mac,a,":")
+	o=""
+	for (i=1;i<=6;i++) {
+		o=sprintf("%s:%02s", o, a[i])
+	}
+	gsub(/ /,"0",o)		# some awks don't provide leading zeros on %s
+	return tolower(substr(o,2))
+}
 
-arp -an | awk -v bold="$md" -v norm="$me" '
+BEGIN {
 
-  function fix(addr,     a, o, fs, i) {
-    split(tolower(addr), a, ":")
-    o=""; fs=""
-    for (i=1; i<=6; i++) {
-      o=sprintf("%s%s%02s", o, fs, a[i])
-      fs=":"
-    }
-    gsub(/ /,"0",o)	# because "%02s" does not work in gawk/mawk
-    return o
-  }
+	#print nrmlz("a:b:c:D:e:F")
+	#print nrmlz("000:1:2:3:4:5")
 
-  BEGIN {
-    FS="[[:space:]]+"
-  }
+	while (getline < "/etc/ethers") {
+		macs[nrmlz($1)]=$2
+	}
 
-  /incomplete/ { next }
+	if (!system("test -t 0")) {
+		em="\033[1m"; no="\033[0m"
+	} else {
+		em=""; no=""
+	}
+	close(cmd)
 
-  NR==FNR && /^[0-9a-f][0-9a-f]?:/ {
-    e[fix($1)]=$2
-    #print "> " fix($1)
-  }
-  NR==FNR { next }
+	while ("arp -an" | getline) {
+		mac=nrmlz($4)
+		if (mac in macs) {
+			$4=sprintf("%s(%s%s%s)", mac, em, macs[mac], no)
+			$4=sprintf("(%s%s%s)%s", em, macs[mac], no, mac)
+		} else
+		if (/incomplete/) {
+			continue
+		}
+		print
+	}
 
-  { $4 = fix($4) }
-
-  $4 in e {
-    #$4=bold e[$4] norm "(" $4 ")"
-    $4=$4 "(" bold e[$4] norm ")"
-  }
-
-  1' /etc/ethers - 
-#| column -t | sed -nE -e '/([^[:space:]]+[^[:space:]]+)/{;s//\1      /;p;d;}' -e '/([^[:space:]]+)/{;s//\1   /;p;d;}' -e p
+}
 
