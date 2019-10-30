@@ -1,0 +1,39 @@
+#!/usr/bin/awk -f
+
+BEGIN {
+  r=0
+  OFS=FS=","
+}
+
+FNR==1 {
+  delete h
+  for (i=1; i<=NF; i++) {
+    h[i]=$i
+  }
+  next
+}
+
+{
+  r++
+  for (i=1; i<=NF; i++) {
+    output[r,h[i]]=$i
+  }
+}
+
+END {
+  sep=""
+  for (i=1; i<=length(h); i++) {
+    printf "%s%s", sep, h[i]
+    sep=OFS
+  }
+  printf "%s", ORS
+  for (o=1; o<=r; o++) {
+    sep=""
+    for (i=1; i<=length(h); i++) {
+      printf "%s%s", sep, output[o,h[i]]
+      sep=OFS
+    }
+    printf "%s", ORS
+  }
+}
+
