@@ -5,7 +5,12 @@ BEGIN {
   OFS=FS=","
 }
 
+function fcwarning() {
+    printf "ERROR: field count does not match in %s(%d) ... YMMV.\n", FILENAME, FNR > "/dev/stderr"
+}
+
 FNR==1 {
+  if (NR>1 && NF != length(h)) fcwarning()
   delete h
   for (i=1; i<=NF; i++) {
     h[i]=$i
@@ -14,6 +19,7 @@ FNR==1 {
 }
 
 {
+  if (NF != length(h)) fcwarning()
   r++
   for (i=1; i<=NF; i++) {
     output[r,h[i]]=$i
