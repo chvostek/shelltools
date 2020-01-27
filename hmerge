@@ -1,13 +1,18 @@
 #!/usr/bin/awk -f
 
+# See also: https://tools.ietf.org/html/rfc4180
+
 BEGIN {
   r=0
   OFS=FS=","
+  #print "> ARG1=" ARGV[1]; exit 1
 }
 
 function fcwarning() {
     printf "ERROR: field count does not match in %s(%d) ... YMMV.\n", FILENAME, FNR > "/dev/stderr"
 }
+
+/\r$/ { $0 = substr($0,0,length($0)-1) }
 
 FNR==1 {
   if (NR>1 && NF != length(h)) fcwarning()
