@@ -1,0 +1,24 @@
+
+# Normalize IP and Ethernet addresses
+
+nrmlz() {
+	local parts fmt match IFS
+	local input chunk
+	case "$1" in
+		*.*)	parts=4; fmt="%d";   IFS=. ;;
+		*:*)	parts=6; fmt="%02s"; IFS=: ;;
+		*)	return 65 ;;
+	esac
+	input=$(echo "$1" | tr '[A-Z]' '[a-z]')
+	case "$input" in
+		#*[!0-9a-f:]*) return 1 ;;
+		*[!0-9a-f${IFS}]*) return 1 ;;
+	esac
+	set $input
+	printf "$fmt" "$1"
+	for chunk in $(seq -s "$IFS" 2 $parts); do
+		eval printf "${IFS}$fmt" "\$$chunk"
+	done
+	printf '\n'
+}
+

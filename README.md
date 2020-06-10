@@ -83,3 +83,10 @@ where you think it should go. :-)
 	if that IP is on the local network (i.e. is in the ARP table),
 	or run a command to connect to it otherwise.
 
+**nrmlz** normalize IP adn MAC addresses
+
+	nrmlz [address]
+
+	Returns the address you provided in lower case, leading zeros
+	stripped from IPs and added to components of MACs.
+
