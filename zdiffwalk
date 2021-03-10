@@ -1,106 +1,155 @@
 #!/usr/bin/env bash
 
-usage() {
-  echo ""
-  echo "Usage: ${0##*/} [options] dataset"
-  echo ""
-  echo "Options include:"
-  echo "  -t  include timestamp of changed files"
-  echo ""
-  echo "Once running, you can nagivate using:"
-  echo "   j  next pair"
-  echo "   k  previous pair"
-  echo "   l  display a list of snapshots"
-  echo "   g  go to a specific point in the list"
-  echo "   z  zoom"
-  echo "   r  refresh snapshot list"
-  echo "   q  quit"
-  echo ""
+zdiffwalk_usage() {
+	cat <<EOusage | mdformat
+
+**NAME**
+	${0##*/} - walk through zfs snapshots, showing diffs
+
+**SYNOPSIS**
+	${0##*/} [**-t**] _dataset_
+
+**DESCRIPTION**
+	Walks through a dataset's zfs snapshots, listing the file
+	differences between each pair
+
+	Options:
+	**-t**	include timestamp of changed files
+
+	Once running, you can nagivate using:
+	**j**	next pair
+	**k**	previous pair
+	**l**	display a list of snapshots
+	**g**	go to a specific point in the list
+	**z**	zoom
+	**r**	refresh snapshot list
+	**q**	quit
+
+EOusage
 }
 
-# Defaults
-if [ -t 0 ]; then
-  Verbose=true; vflag="-v"
-else
-  Verbose=false; vflag=""
-fi
-showtime=false
+zdiffwalk_briefusage() {
+	cat <<EObrief | mdformat
+**j** = next, **k** = previous, **l** = list snapshots, **g** = go snap,
+**z** = zoom, **r** = refresh list, **q** = quit
+EObrief
+}
 
-# Options
-while getopts vqt opt; do
-  case "$opt" in
-    v)	Verbose=true; vflag="-v" ;;
-    q)	Verbose=false; vflag="" ;;
-    t)	showtime=true ;;
-    *)	usage; exit 1 ;;
-  esac
-done
-shift $((OPTIND - 1))
+mdformat() {
+	local md; md=$(tput md)	# bold
+	local so; so=$(tput so)	# standout (inverse?)
+	local us; us=$(tput us)	# underline
+	local mr; mr=$(tput mr)	# reverse
+	local me; me=$(tput me)	# exit attributes
+	sed -E \
+		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
+		-e "s/\*([^*]+)\*/$us\1$me/g" \
+		-e "s/_([^_]+)_/$us\1$me/g" \
+		-e "s/^#+ *(.+)/$so\1$me/g" \
+		-e "s/#([^#]+)#/$mr\1$me/g"
+}
 
-# Sanity
-if [ -z "$1" ]; then
-  usage
-  exit 1
-elif ! zfs list -Ho name "$1" >/dev/null; then
-  exit 1
-elif ! zfs list -t snapshot -rHo name | grep -q "^$1@"; then
-  echo "cannot diff '$1': dataset has no snapshots" >&2
-  exit 1
-fi
+zdiffwalk_vars() {
+	local -g zdiffwalk_snaps=()
+	local -g Verbose
+	# Defaults
+	if [ -t 0 ]; then
+		Verbose=true
+	else
+		Verbose=false
+	fi
+	showtime=false
+}
 
-snaps=($(zfs list -t snapshot -rHo name -d 1 "$1"))
+zdiffwalk() {
+	zdiffwalk_vars
 
-if [ ${#snaps[@]} -eq 1 ]; then
-  if $showtime; then
-    zfs diff -t "${snaps[$lhs]}" | sed 's/^\([0-9]*\).[0-9]*/\1/' | while read d t line; do printf "%s\t%s\t%s\n" "$(date -r $d '+[%Y-%m-%d %T]')" "$t" "$line"; done
-  else
-    zfs diff "${snaps[0]}"
-  fi
-  exit $?
-fi
+	local i opt
+	local lhs=0
 
-echo "Browsing ${#snaps[@]} snapshots..."
-for ((i=0;i<${#snaps[@]};i++)); do
-  printf "(%d) %s\n" "$i" "${snaps[$i]}"
-done
+	# Options
+	while getopts vqt opt; do
+		case "$opt" in
+			v)	Verbose=true ;;
+			q)	Verbose=false ;;
+			t)	showtime=true ;;
+			*)	zdiffwalk_usage; exit 1 ;;
+		esac
+	done
+	shift $((OPTIND - 1))
 
-lhs=0
-while :; do
-  echo ">> ($lhs) zfs diff \"${snaps[$lhs]}\" \"${snaps[$((lhs+1))]}\""
-  if $showtime; then
-    zfs diff -t "${snaps[$lhs]}" "${snaps[$((lhs+1))]}" | sed 's/^\([0-9]*\).[0-9]*/\1/' | while read d t line; do printf "%s\t%s\t%s\n" "$(date -r $d '+[%Y-%m-%d %T]')" "$t" "$line"; done
-  else
-    zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}"
-  fi
-  choice=""
-  while :; do
-    read -s -n 1 -p "(j/k/g/l/z/q)? " choice
-    echo "$choice"
-    case "$choice" in
-      q) break 2 ;;
-      j) ((lhs++)) ;;
-      k) ((lhs--)) ;;
-      z)
-         zfs diff "${snaps[$lhs]}" "${snaps[$((lhs+1))]}" | nl
-         ;;
-      g) read -p "Jump to (0-$((${#snaps[@]} - 1))): " go
-         if [[ "$go" =~ ^[0-9]+$ ]] && [ $go -lt ${#snaps[@]} ]; then
-           lhs=$go
-         fi
-         ;;
-      l) for ((i=0;i<${#snaps[@]};i++)); do
-           printf "(%d) %s\n" "$i" "${snaps[$i]}"
-         done
-         ;&
-      r) snaps=($(zfs list -t snapshot -rHo name -d 1 "$1")) ;;
-      \?) usage ;;
-      *) continue ;;
-    esac
-    break
-  done
-  case "$lhs" in
-    -1) lhs=0 ;;
-    ${#snaps[@]}) break ;;
-  esac
-done
+	[[ $# -eq 0 ]] && { zdiffwalk_usage; exit 65; }
+
+	if ! zfs list -Ho name "$1" >/dev/null; then
+		exit 65
+	elif ! zfs list -t snapshot -rHo name | grep -q "^$1@"; then
+		echo "cannot diff '$1': dataset has no snapshots" >&2
+		exit 65
+	fi
+
+	mapfile -t zdiffwalk_snaps < <(zfs list -t snapshot -rHo name -d 1 "$1")
+
+	if [ ${#zdiffwalk_snaps[@]} -eq 1 ]; then
+		if $showtime; then
+			zfs diff -t "${zdiffwalk_snaps[$lhs]}" | sed 's/^\([0-9]*\).[0-9]*/\1/' |
+			while read -r d t line; do printf "%s\t%s\t%s\n" "$(date -r "$d" '+[%Y-%m-%d %T]')" "$t" "$line"; done
+		else
+			zfs diff "${zdiffwalk_snaps[0]}"
+		fi
+		exit $?
+	fi
+
+	$Verbose && echo "Browsing ${#zdiffwalk_snaps[@]} snapshots..."
+	for ((i=0;i<${#zdiffwalk_snaps[@]};i++)); do
+		printf "(%d) %s\n" "$i" "${zdiffwalk_snaps[$i]}"
+	done
+
+	while :; do
+		echo ">> ($lhs) zfs diff \"${zdiffwalk_snaps[$lhs]}\" \"${zdiffwalk_snaps[$((lhs+1))]}\""
+		if $showtime; then
+			zfs diff -t "${zdiffwalk_snaps[$lhs]}" "${zdiffwalk_snaps[$((lhs+1))]}" | sed 's/^\([0-9]*\).[0-9]*/\1/' |
+			while read -r d t line; do printf "%s\t%s\t%s\n" "$(date -r "$d" '+[%Y-%m-%d %T]')" "$t" "$line"; done
+		else
+			zfs diff "${zdiffwalk_snaps[$lhs]}" "${zdiffwalk_snaps[$((lhs+1))]}"
+		fi
+		choice=""
+		while :; do
+			read -s -n 1 -p "(j/k/g/l/z/r/?/q)? " choice
+			echo "$choice"
+			case "$choice" in
+				q) break 2 ;;
+				j) ((lhs++)) ;;
+				k) ((lhs--)) ;;
+				z)
+				 	zfs diff "${zdiffwalk_snaps[$lhs]}" "${zdiffwalk_snaps[$((lhs+1))]}" | nl
+				 	;;
+				g)
+					read -p "Jump to (0-$((${#zdiffwalk_snaps[@]} - 1))): " go
+					if [[ "$go" =~ ^[0-9]+$ ]] && [ "$go" -lt ${#zdiffwalk_snaps[@]} ]; then
+						lhs=$go
+					fi
+					;;
+				l)
+					for ((i=0;i<${#zdiffwalk_snaps[@]};i++)); do
+					 	printf "(%d) %s\n" "$i" "${zdiffwalk_snaps[$i]}"
+					done
+					;&
+				r) mapfile -t zdiffwalk_snaps < <(zfs list -t snapshot -rHo name -d 1 "$1") ;;
+				\?) zdiffwalk_briefusage ;;
+				*) continue ;;
+			esac
+			break
+		done
+		case "$lhs" in
+			-1) lhs=0 ;;
+			${#zdiffwalk_snaps[@]}) break ;;
+		esac
+	done
+}
+
+# only execute if we're called directly
+case "$-" in
+	*i*) : ;;
+	*) zdiffwalk "$@" ;;
+esac
 
