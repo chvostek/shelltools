@@ -22,3 +22,9 @@ nrmlz() {
 	printf '\n'
 }
 
+# only execute if we're called directly
+case "$-" in
+	*i*) : ;;
+	*) nrmlz "$@" ;;
+esac
+

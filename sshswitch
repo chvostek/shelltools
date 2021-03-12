@@ -94,7 +94,7 @@ elif [ $# -eq 1 ] && grep -qw "$1" /etc/ethers; then
 elif [ $# -eq 1 ]; then
 	printf 'ERROR: host not found\n' >&2
 	exit 68
-elif arp -an | fgrep -q "$1"; then
+elif arp -an | fgrep -q "($1).*([0-9a-f][0-9a-f]?):"; then
 	# If the IP in $1 is local, connect directly
 	case "$1" in
 		*:*)	$dopt && echo nc "${1%:*}" "${1#*}" ;
