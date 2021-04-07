@@ -8,7 +8,7 @@ sshswitch_usage() {
 
 **SYNOPSIS**
 	${0##*/} [**-dn**] _hostip_ "_command line_"
-	${0##*/} [**-dn**] _hostname_
+	${0##*/} [**-dn**] _hostname_ "_command line_"
 
 **DESCRIPTION**
 	This is a ProxyCommand helper.
@@ -21,7 +21,7 @@ sshswitch_usage() {
 	In the second usage, _hostname_ is a name found in /etc/ethers,
 	whose MAC address will be looked up in the local ARP table. This
 	allows you to ssh to hosts whose IP addresses change, but whose
-	(static) ethernet address is recorded.
+	(static) ethernet address is known.
 
 	The **-d** option causes extra debugging information to be sent to
 	stderr. The **-n** option causes ${0##*/} to print the connection
@@ -94,7 +94,7 @@ elif [ $# -eq 1 ] && grep -qw "$1" /etc/ethers; then
 elif [ $# -eq 1 ]; then
 	printf 'ERROR: host not found\n' >&2
 	exit 68
-elif arp -an | fgrep -q "($1).*([0-9a-f][0-9a-f]?):"; then
+elif arp -an | awk -v h="$1" '$2=="("h")" && $4~/[0-9a-f]+:/{r=0} END{exit r}' r=1 -; then
 	# If the IP in $1 is local, connect directly
 	case "$1" in
 		*:*)	$dopt && echo nc "${1%:*}" "${1#*}" ;
