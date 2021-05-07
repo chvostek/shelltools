@@ -36,11 +36,14 @@ EObrief
 }
 
 mdformat() {
-	local md; md=$(tput md)	# bold
-	local so; so=$(tput so)	# standout (inverse?)
-	local us; us=$(tput us)	# underline
-	local mr; mr=$(tput mr)	# reverse
-	local me; me=$(tput me)	# exit attributes
+	local md so us mr me
+	if [ -t 1 ]; then
+		md=$(tput md)	# bold
+		so=$(tput so)	# standout (inverse?)
+		us=$(tput us)	# underline
+		mr=$(tput mr)	# reverse
+		me=$(tput me)	# exit attributes
+	fi
 	sed -E \
 		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
 		-e "s/\*([^*]+)\*/$us\1$me/g" \
