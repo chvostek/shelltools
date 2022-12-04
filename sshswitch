@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
 
 sshswitch_usage() {
-	cat <<EOusage | mdformat | ${PAGER:-cat}
+	mdformat <<EOusage | ${PAGER:-cat}
 
 **NAME**
 	${0##*/} - select ssh connection method based on availability
 
 **SYNOPSIS**
-	${0##*/} [**-dn**] _hostip_ "_command line_"
-	${0##*/} [**-dn**] _hostname_ "_command line_"
+	${0##*/} [**-dn**] _hostname_
+	${0##*/} [**-dn**] _host_ ["_command line_"]
 
 **DESCRIPTION**
 	This is a ProxyCommand helper.
 
-	In the first usage, the first option (**\$1**) is the IP address
-	you're trying to reach. If the IP is local (i.e. in the ARP
-	cache), we connect to it directly. Otherwise, we execute the
+	In the first usage, _hostname_ is a name found in /etc/ethers,
+	whose MAC address will be looked up in the local ARP cache
+	(after 1 ping if required). This allows you to ssh to hosts
+	whose IP addresses change, but whose (static) ethernet address
+	is known, without configuring dynamic DNS in your DHCP server.
+
+	In the second usage, the first option is the name or IP address
+	you're trying to reach. It may be an IP wildcard pattern (for
+	example "192.168.1.*").  If the first option is a hostname, then
+	the IP is looked up in /etc/ethers. If the IP is local (i.e. in
+	the ARP cache after 1 ping), we connect to it directly, as with
+	the first usage. However, if that fails, we execute the
 	remaining options as a command line to establish the connection.
 
-	In the second usage, _hostname_ is a name found in /etc/ethers,
-	whose MAC address will be looked up in the local ARP table. This
-	allows you to ssh to hosts whose IP addresses change, but whose
-	(static) ethernet address is known.
-
 	The **-d** option causes extra debugging information to be sent to
-	stderr. The **-n** option causes ${0##*/} to print the connection
+	stderr. The **-n** option causes ${0##*/} to print the
 	commands it would run instead of actually running them.
 
 **EXAMPLES**
@@ -33,24 +37,32 @@ sshswitch_usage() {
 	that gateway is perhaps accessible from some other host via an
 	SSH tunnel or VPN.
 
-	host gw 192.168.2.1
-	    ProxyCommand ~/bin/sshswitch 192.168.2.1 ssh -xaqW10.0.0.2:22 foo
+	**host gw 192.168.2.1**
+	    **ProxyCommand ~/bin/sshswitch 192.168.2.1 ssh -xaqW10.0.0.2:22 foo**
 
-	host bar 192.168.2.*
-	    ProxyCommand ~/bin/sshswitch %h "ssh -xaqW%h:22 gw"
+	Note that quotes aroung the command are optional.
+
+	**host bar 192.168.2.***
+	    **ProxyCommand ~/bin/sshswitch %h "ssh -xaqW%h:22 gw"**
+
+	The following could be used for any host that might get a
+	dynamic IP address, for example, from a DHCP server.
 
 	The following might be used to connect to hosts with dynamic
-	(DHCP-assigned) IP addresses on the local network, where the
-	only thing static is the MAC address.
+	(DHCP-assigned) IP addresses on the local network, without the
+	need to use a DHCP-controlled DNS zone. In this case, the only
+	thing static is the MAC address.
 
 	~/.ssh/config:
 
-	    host flarn spoo
-	        ProxyCommand ~/bin/sshswitch %h
+	    **host flarn spoo rpi**
+	        **ProxyCommand ~/bin/sshswitch %h**
 
 	/etc/ethers:
 
-	    dc:a9:04:03:02:01       flarn
+	    **dc:a9:04:03:02:01       flarn**
+	    **dc:a9:04:03:02:03       spoo**
+	    **b8:27:eb:03:02:01       rpi**
 
 	$ arp -an
 	? (192.168.1.2) at dc:a9:04:03:02:01 on em0 ifscope [ethernet]
@@ -60,7 +72,7 @@ EOusage
 
 mdformat() {
 	local md so us mr me
-	if [ -t 1 ]; then
+	if $topt; then
 		md=$(tput md)	# bold
 		so=$(tput so)	# standout (inverse?)
 		us=$(tput us)	# underline
@@ -74,6 +86,12 @@ mdformat() {
 		-e "s/^#+ *(.+)/$so\1$me/g" \
 		-e "s/#([^#]+)#/$mr\1$me/g"
 }
+
+if [ -t 1 ]; then
+	topt=true
+else
+	topt=false
+fi
 
 dopt=false; nopt=false
 while getopts dn opt; do
