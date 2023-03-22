@@ -1,9 +1,85 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-for i in $(jot "$1" "$1" 1); do
-	printf "\r%d ... " "$i"
-	sleep 1
-done
+countdown_usage() {
+	cat <<EOusage | mdformat
 
-echo "Done!"
+**NAME**
+	${0##*/} - sleep with noise
+
+**SYNOPSIS**
+	${0##*/} -h
+	${0##*/} [**-iq**] _s_
+
+**DESCRIPTION**
+	Counts down from the given number, 1 second at a time. If **-q** is
+	specified, do so quietly, which is functionally similar to _sleep_.
+	If **-i** is specified, then the countdown may be cut short with
+	user input without error. _s_ is the number of seconds to count
+	down, an integer.
+
+EOusage
+}
+
+mdformat() {
+	local md so us mr me
+	if [ -t 1 ]; then
+		md=$(tput md)	# bold
+		so=$(tput so)	# standout (inverse?)
+		us=$(tput us)	# underline
+		mr=$(tput mr)	# reverse
+		me=$(tput me)	# exit attributes
+	fi
+	sed -E \
+		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
+		-e "s/\*([^*]+)\*/$us\1$me/g" \
+		-e "s/_([^_]+)_/$us\1$me/g" \
+		-e "s/^#+ *(.+)/$so\1$me/g" \
+		-e "s/#([^#]+)#/$mr\1$me/g"
+}
+
+countdown_opts() {
+	local -g -i countdown_s
+	local -g countdown_opti countdown_optq
+	countdown_opti=false
+	countdown_optq=false
+	while getopts iqh opt; do
+		case "$opt" in
+			h) countdown_usage; exit 0 ;;
+			q) countdown_optq=true ;;
+			i) countdown_opti=true ;;
+			*) countdown_usage; exit 64 ;;
+		esac
+	done
+	shift $((OPTIND - 1))
+	countdown_s="$1"
+}
+
+countdown() {
+	countdown_opts "$@"
+	local what
+	$countdown_optq || { $countdown_opti && echo "Press any non-whitespace key to abort." >&2; }
+	for i in $(jot "$countdown_s" "$countdown_s" 1); do
+		if [ -z "$what" ]; then
+			sleep 1
+		else
+			break
+		fi
+
+		$countdown_optq || printf "\r%d ... " "$i"
+
+		if $countdown_opti; then
+			read -t 1 -n 1 what
+		else
+			sleep 1
+		fi
+	done
+
+	$countdown_optq || echo "Done!"
+}
+
+# only execute if we're called directly
+case "$-" in
+	*i*) : ;;
+	*) countdown "$@" ;;
+esac
 
