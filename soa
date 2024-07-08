@@ -17,6 +17,8 @@ soa_usage() {
 	
 	Options:
 	-h	This help
+	-r	RCSify the SOA file
+	-R	Don't RCSify the SOA file
 	-v	Verbose, default if on terminal
 	-q	Quiet, default if not on terminal
 	-d	Debug
@@ -24,6 +26,12 @@ soa_usage() {
 
 	It's likely you'd want to use -d and -n together when testing.
 	Quiet mode turns off debug. Last option wins.
+
+	RCS will be used automatically if the SOA file is RCSified and
+	checked in. This behiour is suppressed with **-R**.  Specifying **-r**
+	will basically cause the update to fail if the file can't be
+	RCSified for some reason (tools not available, etc.) If the SOA
+	file is already checked out then it will not be checked in.
 
 **EXAMPLES**
 	${0##*/} /etc/named/master/example.com.zonefile
@@ -62,9 +70,11 @@ mdformat() {
 
 Verbose=$([ -t 0 ] && echo true || echo false)
 Quiet=false; Debug=false; Doit=true
-while getopts hvqdn opt; do
+while getopts hrRvqdn opt; do
 	case "$opt" in
 		h) soa_usage; exit 0 ;;
+		r) useRCS=true ;;
+		R) useRCS=false ;;
 		v) Verbose=true; Quiet=false ;;
 		q) Verbose=false; Quiet=true; Debug=false ;;
 		d) Verbose=true; Quiet=false; Debug=true ;;
