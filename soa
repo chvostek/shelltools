@@ -1,26 +1,104 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+soa_usage() {
+	t=$([ -t 0 ] && echo true || echo false)
+	mdformat $t <<EOusage | ${PAGER:-cat} 
+**NAME**
+	${0##*/} - update SOA serial number in zonefile
+
+**SYNOPSIS**
+	${0##*/} [**-vqdn**] _zonefile_
+
+**DESCRIPTION**
+	Finds a zonefile's SOA record and updates the serial number
+	based on the current date, using the format YYYYMMDDII, where II
+	is 00 if the previous serial number was "older", or increments
+	by 1 if the old SOA matched the current date.
+	
+	Options:
+	-h	This help
+	-v	Verbose, default if on terminal
+	-q	Quiet, default if not on terminal
+	-d	Debug
+	-n	Just show what we re doing, don't actually do it
+
+	It's likely you'd want to use -d and -n together when testing.
+	Quiet mode turns off debug. Last option wins.
+
+**EXAMPLES**
+	${0##*/} /etc/named/master/example.com.zonefile
+
+**SEE ALSO**
+
+EOusage
+}
+
+mdformat() {
+	local md so us mr me
+	local t="${1:-false}"
+	if "$t" || [ -t 1 ]; then
+		if [[ $(uname -s) = Linux ]]; then
+			# https://www.linuxcommand.org/lc3_adv_tput.php
+			md=$(tput -T "${TERM:-xterm}" bold)   # bold
+			so=$(tput -T "${TERM:-xterm}" rev)   # standout (inverse?)
+			us=$(tput -T "${TERM:-xterm}" smul)   # underline
+			#mr=$(tput mr)	 # reverse
+			me=$(tput -T "${TERM:-xterm}" sgr0)   # exit attributes
+		else
+			md=$(tput md)	# bold
+			so=$(tput so)	# standout (inverse?)
+			us=$(tput us)	# underline
+			#mr=$(tput mr)	 # reverse
+			me=$(tput me)	# exit attributes
+		fi
+	fi
+	sed -E \
+		-e "s/\*\*([^*]+)\*\*/$md\1$me/g" \
+		-e "s/\*([^*]+)\*/$us\1$me/g" \
+		-e "s/_([^_]+)_/$us\1$me/g" \
+		-e "s/^#+ *(.+)/$so\1$me/g" \
+		-e "s/#([^#]+)#/$mr\1$me/g"
+}
+
+Verbose=$([ -t 0 ] && echo true || echo false)
+Quiet=false; Debug=false; Doit=true
+while getopts hvqdn opt; do
+	case "$opt" in
+		h) soa_usage; exit 0 ;;
+		v) Verbose=true; Quiet=false ;;
+		q) Verbose=false; Quiet=true; Debug=false ;;
+		d) Verbose=true; Quiet=false; Debug=true ;;
+		n) Doit=false ;;
+		*) soa_usage; exit 64 ;;
+	esac
+done
+shift $((OPTIND - 1))
 
 SOAfile="$1"
 err=""
 if [ -z "$SOAfile" ]; then
-  err="No file specified"
+	err="No file specified. -h for help"
 elif [ ! -e "$SOAfile" ]; then
-  err="File not found"
+	err="File not found: $SOAfile"
 fi
 if [ -n "$err" ]; then
-  printf 'ERROR: %s\n' "$err" >&2
-  exit 1
+	printf 'ERROR: %s\n' "$err" >&2
+	exit 64
 fi
 
-read line soa < <(awk -v field=6 '/^@/ { if($2=="IN"){field++} for(i=1;i<field;i++){if(i==NF){field=field-NF;getline;i=1}} print NR,$field}' $SOAfile)
+read line soa < <(awk -v field=5 '/^@/ { if($2=="IN"){field++} if($6=="("){field++} for(i=1;i<field;i++){if(i==NF){field=field-NF;getline;i=1}} print NR,$field}' $SOAfile)
 
 newsoa=$(date '+%Y%m%d00')
 
-while [ "$newsoa" -le "$soa" ]; do
-	newsoa=$((newsoa + 1))
-done
+while [[ $((newsoa++)) -le "$soa" ]]; do :; done
 
-if sed -i.bak "${line}s/$soa/$newsoa/" "$SOAfile"; then
-	printf "%s: %s -> %s\n" "$SOAfile" "$soa" "$newsoa"
-fi
+printf -v cmd 'sed -i.bak -e "%ds/%s/%s/" "%s"' "$line" "$soa" "$newsoa" "$SOAfile"
+
+#$Verbose && printf "%s: %s -> %s\n" "$SOAfile" "$soa" "$newsoa"
+#$Debug && echo "sed -i.bak \"${line}s/$soa/$newsoa/\" \"$SOAfile\""
+#$Doit && sed -i.bak "${line}s/$soa/$newsoa/" "$SOAfile"; then
+
+$Verbose && printf "%s: %s -> %s\n" "$SOAfile" "$soa" "$newsoa"
+$Debug && printf 'DEBUG: %s\n' "$cmd"
+$Doit && eval $cmd
 
