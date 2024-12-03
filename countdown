@@ -12,10 +12,10 @@ countdown_usage() {
 
 **DESCRIPTION**
 	Counts down from the given number, 1 second at a time. If **-q** is
-	specified, do so quietly, which is functionally similar to _sleep_.
+	specified, do so quietly, which is functionally like _sleep_.
 	If **-i** is specified, then the countdown may be cut short with
-	user input without error. _s_ is the number of seconds to count
-	down, an integer.
+	user input producing no error. _s_ is the number of seconds to
+	count down, an integer.
 
 EOusage
 }
@@ -38,8 +38,8 @@ mdformat() {
 }
 
 countdown_opts() {
-	local -g -i countdown_s
-	local -g countdown_opti countdown_optq
+	declare -g -i countdown_s
+	declare -g countdown_opti countdown_optq
 	countdown_opti=false
 	countdown_optq=false
 	while getopts iqh opt; do
@@ -57,24 +57,28 @@ countdown_opts() {
 countdown() {
 	countdown_opts "$@"
 	local what
-	$countdown_optq || { $countdown_opti && echo "Press any non-whitespace key to abort." >&2; }
+	local start
+	printf -v start '%(%s)T'
 	for i in $(jot "$countdown_s" "$countdown_s" 1); do
-		if [ -z "$what" ]; then
-			sleep 1
-		else
+		if [ -n "$what" ]; then
 			break
 		fi
 
-		$countdown_optq || printf "\r%d ... " "$i"
+		$countdown_optq || printf "\r%d ... \e[K" "$i"
 
 		if $countdown_opti; then
+			$countdown_optq || printf "Press any non-whitespace key to abort." >&2
 			read -t 1 -n 1 what
+			if [[ $(date '+%s') -gt $(($start + $countdown_s)) ]]; then
+				$countdown_optq || printf "\r%d ... TIME\e[K" "$i"
+				break
+			fi
 		else
 			sleep 1
 		fi
 	done
 
-	$countdown_optq || echo "Done!"
+	$countdown_optq || printf "\r%d ... Done!\e[K\n" "$i"
 }
 
 # only execute if we're called directly
