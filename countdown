@@ -13,9 +13,16 @@ countdown_usage() {
 **DESCRIPTION**
 	Counts down from the given number, 1 second at a time. If **-q** is
 	specified, do so quietly, which is functionally like _sleep_.
-	If **-i** is specified, then the countdown may be cut short with
-	user input producing no error. _s_ is the number of seconds to
-	count down, an integer.
+	If **-i** (interactive) is specified, then the countdown may be cut
+	short with user input producing no error. _s_ is the number of
+	seconds to count down, an integer.
+
+	In interactive (**-i**) mode, the following commands work:
+
+	**r**	Rewing 10 seconds
+	**a**	Advance 10 seconds
+	**q**	Quit
+	**p**	Pause (any key to continue)
 
 EOusage
 }
@@ -40,45 +47,66 @@ mdformat() {
 countdown_opts() {
 	declare -g -i countdown_s
 	declare -g countdown_opti countdown_optq
+	declare -g countdown_debug countdown_time
 	countdown_opti=false
 	countdown_optq=false
-	while getopts iqh opt; do
+	countdown_debug=false
+	countdown_time=""
+	while getopts diqh opt; do
 		case "$opt" in
 			h) countdown_usage; exit 0 ;;
 			q) countdown_optq=true ;;
 			i) countdown_opti=true ;;
+			d) countdown_debug=true; countdown_time=time ;;
 			*) countdown_usage; exit 64 ;;
 		esac
 	done
 	shift $((OPTIND - 1))
 	countdown_s="$1"
+	$countdown_debug && echo "Debug on"
 }
 
 countdown() {
 	countdown_opts "$@"
+	local count
 	local what
 	local start
+	local el
+	local pause_start
 	printf -v start '%(%s)T'
-	for i in $(jot "$countdown_s" "$countdown_s" 1); do
-		if [ -n "$what" ]; then
-			break
-		fi
+	el=$(tput el)
+	count="$countdown_s"
+	while [[ $count -ge 0 ]]; do
+		case "$what" in
+			r) (( count += 10 ))  ;;
+			a) (( count -= 10 ))  ;;
+			q) break ;;
+			p)
+				printf "\r%d ... ${el}" "$count"
+				printf -v pause_start '%(%s)T'
+				read -n 1 -p "PAUSED - press any key to continue"
+				printf -v pause_time '%(%s)T'
+				(( pause_time -= pause_start ))
+				(( start += pause_time ))
+				;;
+		esac
 
-		$countdown_optq || printf "\r%d ... \e[K" "$i"
+		$countdown_optq || printf "\r%d ... ${el}" "$count"
 
 		if $countdown_opti; then
 			$countdown_optq || printf "Press any non-whitespace key to abort." >&2
-			read -t 1 -n 1 what
+			$countdown_time read -t 1 -n 1 what
 			if [[ $(date '+%s') -gt $(($start + $countdown_s)) ]]; then
-				$countdown_optq || printf "\r%d ... TIME\e[K" "$i"
+				$countdown_optq || printf "\r%d ... TIME${el}" "$count"
 				break
 			fi
 		else
 			sleep 1
 		fi
+		(( count-- ))
 	done
 
-	$countdown_optq || printf "\r%d ... Done!\e[K\n" "$i"
+	$countdown_optq || printf "\r%d ... Done!${ek}\n" "$i"
 }
 
 # only execute if we're called directly
