@@ -19,11 +19,17 @@ countdown_usage() {
 
 	In interactive (**-i**) mode, the following commands work:
 
-	**r**	Rewing 10 seconds
-	**a**	Advance 10 seconds
-	**q**	Quit
+	**r** or **+**	RewinR ${COUNTDOWN_JUMP:-10} seconds
+	**a** or **-**	Advance ${COUNTDOWN_JUMP:-10} seconds
+	**q**	Quit (return success)
+	**x**	Quit (return fail)
 	**p**	Pause (any key to continue)
 
+**ENVIRONMENT**
+	Some variables affect the script's behaviour.
+
+	**COUNTDOWN_JUMP**
+		the interval added/removed with 
 EOusage
 }
 
@@ -58,6 +64,7 @@ countdown_opts() {
 			q) countdown_optq=true ;;
 			i) countdown_opti=true ;;
 			d) countdown_debug=true; countdown_time=time ;;
+			j) COUNTDOWN_JUMP="$OPTARG" ;;
 			*) countdown_usage; exit 64 ;;
 		esac
 	done
@@ -71,16 +78,17 @@ countdown() {
 	local count
 	local what
 	local start
-	local el
 	local pause_start
+	local el
 	printf -v start '%(%s)T'
 	el=$(tput el)
 	count="$countdown_s"
 	while [[ $count -ge 0 ]]; do
 		case "$what" in
-			r) (( count += 10 ))  ;;
-			a) (( count -= 10 ))  ;;
+			r|+|=) (( count += ${COUNTDOWN_JUMP:-10} ))  ;;
+			a|-|_) (( count -= ${COUNTDOWN_JUMP:-10} ))  ;;
 			q) break ;;
+			x) echo; exit 1 ;;
 			p)
 				printf "\r%d ... ${el}" "$count"
 				printf -v pause_start '%(%s)T'
@@ -94,7 +102,7 @@ countdown() {
 		$countdown_optq || printf "\r%d ... ${el}" "$count"
 
 		if $countdown_opti; then
-			$countdown_optq || printf "Press any non-whitespace key to abort." >&2
+			$countdown_optq || printf "Rewind/Advance/Quit/Exit/Pause ... " >&2
 			$countdown_time read -t 1 -n 1 what
 			if [[ $(date '+%s') -gt $(($start + $countdown_s)) ]]; then
 				$countdown_optq || printf "\r%d ... TIME${el}" "$count"
