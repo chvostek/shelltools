@@ -90,3 +90,9 @@ where you think it should go. :-)
 	Returns the address you provided in lower case, leading zeros
 	stripped from IPs and added to components of MACs.
 
+**countdown** sleep-like timer that can be adjusted on-the-fly
+
+	countdown [-options] secondsx
+
+	Counts down the numbere i=of specified seconds. Use - and + to
+	subtract/add to the time left, in interactiive mode.
