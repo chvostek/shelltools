@@ -1,11 +1,19 @@
 #!/usr/bin/env gawk -E
-#!/usr/bin/env awk -f
+@load "filefuncs"
+@include "getopt"
 
-function nrmlz(mac,     i,a,o) {
-	if (tolower(mac) !~ /^[0-9a-f]{1,2}(:[0-9a-f]{1,2}){5}$/) return "<" mac ">"
+function nrmlz(mac,     i,a,o,w) {
+	mac=tolower(mac)
+	gsub(/[^0-9a-f:]/,"",mac)
+	w=0
+	if (mac ~ /^[0-9a-f]{1,2}(:[0-9a-f]{1,2}){5}$/) w=6; else
+	if (mac ~ /^[0-9a-f]{1,2}(:[0-9a-f]{1,2}){2}$/) w=3; else
+	if (mac ~ /^[0-9a-f]{12}$/) { w=6; mac=substr(mac,1,2) ":" substr(mac,3,2) ":" substr(mac,5,2) ":" substr(mac,7,2) ":" substr(mac,9,2) ":" substr(mac,11,2) } else
+	if (mac ~ /^[0-9a-f]{6}$/) { w=3; mac=substr(mac,1,2) ":" substr(mac,3,2) ":" substr(mac,5,2) } else
+		return "<" mac ">"
 	split(mac,a,":")
 	o=""
-	for (i=1;i<=6;i++) {
+	for (i=1;i<=w;i++) {
 		o=sprintf("%s:%02s", o, a[i])
 	}
 	gsub(/ /,"0",o)		# some awks don't provide leading zeros on %s
@@ -14,6 +22,15 @@ function nrmlz(mac,     i,a,o) {
 
 function usage() {
 	printf "\nUsage:\n\tnarp -h\n\tnarp\n\n"
+	printf "\tnarp [-e etheersfile]] [-f oidfile] [-u url] [-g]\n"
+	print ""
+}
+
+function exists(file) {
+	if (getline < file) {
+		close(file)
+		return 1
+	}
 }
 
 BEGIN {
@@ -21,32 +38,58 @@ BEGIN {
 	#print nrmlz("a:b:c:D:e:F")
 	#print nrmlz("000:1:2:3:4:5")
 
+	# Defaults
+	#oidurl="https://devtools360.com/en/macaddress/vendorMacs.xml?download=true"
+	oidurl="https://gist.githubusercontent.com/aallan/b4bb86db86079509e6159810ae9bd3e4/raw/846ae1b646ab0f4d646af9115e47365f4118e5f6/mac-vendor.txt"
+	oidfile=ENVIRON["HOME"] "/.OIDlist"
 	gopt=0
-	if (ARGV[0]=="gawk") {
-		if (ARGV[1]=="-h") {
-			usage()
-			exit(64)
-		}
-		if (ARGV[1]=="-g") gopt=1
-	}
-	#print "C=" ARGC; for (i in ARGV) printf "%4s\t%s\n", i, ARGV[i]; exit(3)
+	ethersfile="/etc/ethers"
 
-	while (getline < "/etc/ethers") {
+	while (c = getopt(ARGC, ARGV, "hge:f:u:", "")) {
+		if(c==-1)break
+		if (Optopt=="h") {usage();exit 65} else
+		if (Optopt=="?") {usage();exit 65} else
+		if (Optopt=="g") {gopt=1} else
+		if (Optopt=="e") {ethersfile=Optarg} else
+		if (Optopt=="f") {oidfile=Optarg} else
+		if (Optopt=="u") {oidurl=Optarg} else
+		{print "Invalid option.";usage();exit 65}
+		print c, Optopt, Optarg
+	}
+
+	while (getline < ethersfile) {
 		macs[nrmlz($1)]=$2
 	}
 
+	cmd="curl -o " oidfile ".t " oidurl
+	if (!exists(oidfile)) system(cmd)
+	close(oidfile)
+	close(cmd)
+	if (filetype(oidfile ".t")=="txt") { cmd="mv " oidfile ".t " oidfile; system(cmd); close(cmd) }
+	if (filetype(oidfile ".t")=="xml") { 
+	if (filetype(oidfile ".t")=="csv") { 
+	while (getline < oidfile) {
+		oids[substr(nrmlz($1),1,8)]=substr($0,8)
+	}
+	left="«"; right="»"
+
+	# EMphasis, COlour, NOthing
 	if (gopt || !system("test -t 1")) {
-		em="\033[1m"; no="\033[0m"
+		em="\033[1m"; co="\033[P4"; co="\033[36m"; no="\033[0m"
 	} else {
-		em=""; no=""
+		em=""; co=""; no=""
 	}
 	close(cmd)
 
 	while ("arp -an" | getline) {
 		mac=nrmlz($4)
+		oid=substr(mac,0,8)
 		if (mac in macs) {
 			$4=sprintf("%s(%s%s%s)", mac, em, macs[mac], no)
 			$4=sprintf("(%s%s%s)%s", em, macs[mac], no, mac)
+		} else
+		if (oid in oids) {
+			$4=sprintf("%s%s%s%s%s%s", left, co, oids[oid], no, right, mac)
 		} else
 		if (/incomplete/) {
 			continue
