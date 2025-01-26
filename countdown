@@ -19,7 +19,7 @@ countdown_usage() {
 
 	In interactive (**-i**) mode, the following commands work:
 
-	**r** or **+**	RewinR ${COUNTDOWN_JUMP:-10} seconds
+	**r** or **+**	Rewind ${COUNTDOWN_JUMP:-10} seconds
 	**a** or **-**	Advance ${COUNTDOWN_JUMP:-10} seconds
 	**q**	Quit (return success)
 	**x**	Quit (return fail)
@@ -29,7 +29,12 @@ countdown_usage() {
 	Some variables affect the script's behaviour.
 
 	**COUNTDOWN_JUMP**
-		the interval added/removed with 
+		the interval added/removed in seconds
+		(default 10 if unset)
+	**COUNTDOWN_OPTIONS**
+		default options if none are specified
+		(command line overrides anything specified)
+
 EOusage
 }
 
@@ -69,6 +74,9 @@ countdown_opts() {
 		esac
 	done
 	shift $((OPTIND - 1))
+	if [[ -z "$1" ]]; then
+		exit 1
+	fi
 	countdown_s="$1"
 	$countdown_debug && echo "Debug on"
 }
@@ -114,7 +122,7 @@ countdown() {
 		(( count-- ))
 	done
 
-	$countdown_optq || printf "\r%d ... Done!${ek}\n" "$i"
+	$countdown_optq || printf "\r%d ... Done!${el}\n" "$count"
 }
 
 # only execute if we're called directly
