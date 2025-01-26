@@ -1,5 +1,4 @@
 #!/usr/bin/env gawk -E
-@load "filefuncs"
 @include "getopt"
 
 function nrmlz(mac,     i,a,o,w) {
@@ -21,16 +20,61 @@ function nrmlz(mac,     i,a,o,w) {
 }
 
 function usage() {
-	printf "\nUsage:\n\tnarp -h\n\tnarp\n\n"
-	printf "\tnarp [-e etheersfile]] [-f oidfile] [-u url] [-g]\n"
+	printf "\nUsage:\n\tnarp -[h?]\n\tnarp\n\n"
+	printf "\tnarp [-dFgc] [-e ethersfile]] [-f oidfile] [-u url]n[-p shellscript]\n"
 	print ""
 }
 
-function exists(file) {
-	if (getline < file) {
-		close(file)
-		return 1
-	}
+function exists(file,    r) {
+	r=0
+	r=(system("test -f " file )==0)
+	if (Debug) print "r=" r ", " file
+	return r
+}
+
+function filetype(file,    r, cmd, linor, type) {
+	type="xxx"
+	getline line < file
+	close(file)
+	if (Debug) print "line " line
+	if (index(line,"<xml")) type="xml"
+	if (index(line,",")) type="csv"
+	if (match(line,"<[a-zA-Z0-9]+ xmlns=")) type="xml"
+	if (match(line,"000000[	 ]+.*[Xx][Ee][Rr][Oo][Xx]")) type="txt"
+	cmd="file " file; cmd | getline r; if (index(r,"text")) type=txt
+	#if (match(line,"[0-9a-fA-F][0-9a-fA-F]:?[0-9a-fA-F][0-9a-fA-F]:?[0-9a-fA-F][0-9a-fA-F] +[[:alnum:] ]+")) type="txt"
+	if (Debug) print "file " file " type " typ
+	return type
+}
+
+function trim(text) {
+	sub(/^[ 	]+/,"",text)
+	sub(/[ 	]+$/,"",text)
+	return text
+} 
+
+function savexsl() {
+	print "<xsl:stylesheet version=\"1.0\"" > xslfile
+	print "  xmlns:c=\"http://www.cisco.com/server/spt\"" >> xslfile
+	print "  xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">" >> xslfile
+	print "" >> xslfile
+	print "  <xsl:output method=\"text\" />" >> xslfile
+	print "" >> xslfile
+	print "  <xsl:template match=\"/\">" >> xslfile
+	print "    <xsl:apply-templates select=\"//c:VendorMapping\" />" >> xslfile
+	print "  </xsl:template>" >> xslfile
+	print "" >> xslfile
+	print "  <xsl:template match=\"c:VendorMapping\">" >> xslfile
+	print "    <xsl:for-each select=\"@*\">" >> xslfile
+	print "      <xsl:if test=\"not( position() = 1 )\">" >> xslfile
+	print "        <xsl:text>  </xsl:text>" >> xslfile
+	print "      </xsl:if>" >> xslfile
+	print "      <xsl:value-of select=\".\" />" >> xslfile
+	print "    </xsl:for-each>" >> xslfile
+	print "    <xsl:text>&#10;</xsl:text> <!--* line feed *-->" >> xslfile
+	print "  </xsl:template>" >> xslfile
+	print "</xsl:stylesheet>" >> xslfile
+	close(xslfile)
 }
 
 BEGIN {
@@ -39,42 +83,67 @@ BEGIN {
 	#print nrmlz("000:1:2:3:4:5")
 
 	# Defaults
-	#oidurl="https://devtools360.com/en/macaddress/vendorMacs.xml?download=true"
-	oidurl="https://gist.githubusercontent.com/aallan/b4bb86db86079509e6159810ae9bd3e4/raw/846ae1b646ab0f4d646af9115e47365f4118e5f6/mac-vendor.txt"
+	oidurl="https://devtools360.com/en/macaddress/vendorMacs.xml?download=true"; proccmd="bash -c \"xsltproc -o @oidfile@ @xslfile@ <( sed '/<\\/*M/s/M.*/xml>/' @tmpfile@ )\""
+	oidurl="https://gist.githubusercontent.com/aallan/b4bb86db86079509e6159810ae9bd3e4/raw/846ae1b646ab0f4d646af9115e47365f4118e5f6/mac-vendor.txt"; proccmd="sed 's/\\(..\\)\\(..\\)/\\1:\\2:/' @tmpfile@ > @oidfile@"
+	oidurl="https://maclookup.app/downloads/csv-database/get-db?t=25-01-26"; proccmd="gawk --csv '{print $1 "  " $2}' @tmpfile@ > @oidfile@"
+	oidurl="https://www.wireshark.org/download/automated/data/manuf.gz"; proccmd="gunzip < @tmpfile@ | sed 's/	[^	]*$//' > @oidfile@"
+	# proccmd="mv -v @tmpfile@ @oidfile@"
 	oidfile=ENVIRON["HOME"] "/.OIDlist"
-	gopt=0
+	Colours=0; Debug=0
 	ethersfile="/etc/ethers"
+	oids[1]=""; delete oids[1]
+	xslfile=oidfile ".xsl"
+	if (!exists(xslfile)) savexsl()
+	Fetch=0
 
-	while (c = getopt(ARGC, ARGV, "hge:f:u:", "")) {
+	if (!exists(oidfile)) Fetch=1
+
+	while (c = getopt(ARGC, ARGV, "hdFgce:f:u:p:", "")) {
 		if(c==-1)break
 		if (Optopt=="h") {usage();exit 65} else
 		if (Optopt=="?") {usage();exit 65} else
-		if (Optopt=="g") {gopt=1} else
+		if (Optopt=="d") {Debug=1} else
+		if (Optopt=="F") {Fetch=1} else
+		if (Optopt=="g") {Colours=1} else
+		if (Optopt=="c") {Colours=1} else
 		if (Optopt=="e") {ethersfile=Optarg} else
 		if (Optopt=="f") {oidfile=Optarg} else
 		if (Optopt=="u") {oidurl=Optarg} else
+		if (Optopt=="p") {proccmd=Optarg} else
 		{print "Invalid option.";usage();exit 65}
-		print c, Optopt, Optarg
 	}
 
-	while (getline < ethersfile) {
-		macs[nrmlz($1)]=$2
-	}
+	while (getline < ethersfile) macs[nrmlz($1)]=$2
 
-	cmd="curl -o " oidfile ".t " oidurl
-	if (!exists(oidfile)) system(cmd)
-	close(oidfile)
-	close(cmd)
-	if (filetype(oidfile ".t")=="txt") { cmd="mv " oidfile ".t " oidfile; system(cmd); close(cmd) }
-	if (filetype(oidfile ".t")=="xml") { 
-	if (filetype(oidfile ".t")=="csv") { 
-	while (getline < oidfile) {
-		oids[substr(nrmlz($1),1,8)]=substr($0,8)
+	if (Fetch) {
+		if (Debug) print "Fetching OID list..." > "/dev/stderr"
+		tmpfile=oidfile ".t"
+		if (Debug) {
+			cmd="curl -o " tmpfile " " oidurl
+			print "$ " cmd
+		} else
+			cmd="curl -so " tmpfile " " oidurl
+		system(cmd)
+		close(oidfile)
+		close(cmd)
+		close(tmpfile)
+		if (Debug) system("ls -l " tmpfile)
+		if (proccmd ~ /./) {
+			sub(/@oidfile@/,oidfile,proccmd)
+			sub(/@tmpfile@/,tmpfile,proccmd)
+			sub(/@xslfile@/,xslfile,proccmd)
+			if (Debug) print "ZZ$ " proccmd
+			system(proccmd)
+		}
+		if (Debug) system("ls -l " oidfile)
 	}
+	if (exists(oidfile)) while (getline < oidfile) oids[substr(nrmlz($1),1,8)]=trim(substr($0,9))
+	if (Debug) system("ls -l " oidfile)
+	if (Debug) print "Vendors: " length(oids)
 	left="«"; right="»"
 
 	# EMphasis, COlour, NOthing
-	if (gopt || !system("test -t 1")) {
+	if (Colours || !system("test -t 1")) {
 		em="\033[1m"; co="\033[P4"; co="\033[36m"; no="\033[0m"
 	} else {
 		em=""; co=""; no=""
